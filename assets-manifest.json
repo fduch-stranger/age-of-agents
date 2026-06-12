@@ -1,0 +1,82 @@
+{
+  "comment": "Paczki assetów Agent Citadel. Surowe pliki NIE trafiają do repo (licencje Tiny Swords i CraftPix zakazują redystrybucji). Pobierz zipy ze stron 'page' do katalogu downloads/ pod nazwą '<id>.zip', potem uruchom: npm run assets",
+  "packs": [
+    {
+      "id": "tiny-swords",
+      "theme": "fantasy",
+      "name": "Tiny Swords",
+      "author": "Pixel Frog",
+      "page": "https://pixelfrog-assets.itch.io/tiny-swords",
+      "license": "Custom free — użycie komercyjne i prywatne OK, modyfikacje OK, zakaz redystrybucji/odsprzedaży assetów",
+      "attribution": "Tiny Swords — Pixel Frog (pixelfrog-assets.itch.io/tiny-swords)",
+      "target": "fantasy/tiny-swords",
+      "role": "Rdzeń fantasy: jednostki animowane (Warrior, Lancer, Archer, Monk, Pawn z animacjami pracy), zamek, koszary, wieże, teren, woda, UI"
+    },
+    {
+      "id": "lucifer-sorceress",
+      "theme": "fantasy",
+      "name": "Lucifer — Sorceress",
+      "author": "FoozleCC",
+      "page": "https://foozlecc.itch.io/lucifer-sorceress",
+      "license": "CC0",
+      "attribution": "Lucifer Collection — FoozleCC (opcjonalna, CC0)",
+      "target": "fantasy/lucifer-sorceress",
+      "role": "Magowie fantasy: 4 kierunki × 10 animacji (idle, walk, czarowanie)"
+    },
+    {
+      "id": "lucifer-necromancer",
+      "theme": "fantasy",
+      "name": "Lucifer — Necromancer",
+      "author": "FoozleCC",
+      "page": "https://foozlecc.itch.io/lucifer-4-direction-necromancer",
+      "license": "CC0",
+      "attribution": "Lucifer Collection — FoozleCC (opcjonalna, CC0)",
+      "target": "fantasy/lucifer-necromancer",
+      "role": "Drugi mag fantasy"
+    },
+    {
+      "id": "wyrmsun",
+      "theme": "fantasy",
+      "name": "Wyrmsun CC0 (900+ elementów)",
+      "author": "społeczność Wyrmsun",
+      "page": "https://opengameart.org/content/wyrmsun-cc0-over-900-items",
+      "license": "CC0",
+      "attribution": "Wyrmsun CC0 — opengameart.org (opcjonalna)",
+      "target": "fantasy/wyrmsun",
+      "role": "Zapas budynków fantasy: kuźnia, kopalnia, ratusz"
+    },
+    {
+      "id": "acdrnx-mech",
+      "theme": "scifi",
+      "name": "Sci-Fi Strategy Mech Buildings Isometric",
+      "author": "acdrnx",
+      "page": "https://acdrnx.itch.io",
+      "license": "CC0",
+      "attribution": "Sci-Fi Strategy Mech Buildings — acdrnx (opcjonalna, CC0)",
+      "target": "scifi/acdrnx-mech",
+      "role": "Rdzeń sci-fi (izometryczny): teren, 8 budynków z animacjami, 6 jednostek"
+    },
+    {
+      "id": "craftpix-drones",
+      "theme": "scifi",
+      "name": "Free Drones Pack",
+      "author": "CraftPix (free-game-assets)",
+      "page": "https://free-game-assets.itch.io/free-drones-pack-pixel-art",
+      "license": "CraftPix free — komercja OK, zakaz redystrybucji surowych plików",
+      "attribution": "Free Drones Pack — craftpix.net",
+      "target": "scifi/craftpix-drones",
+      "role": "Drony sci-fi z animacjami idle/scan/lot"
+    },
+    {
+      "id": "lunar-battle",
+      "theme": "scifi",
+      "name": "Free Lunar Battle Pack",
+      "author": "MattWalkden",
+      "page": "https://mattwalkden.itch.io/lunar-battle-pack",
+      "license": "CC0",
+      "attribution": "Lunar Battle Pack — MattWalkden (opcjonalna, CC0)",
+      "target": "scifi/lunar-battle",
+      "role": "Teren księżycowy (recolor na Marsa), struktury bazy"
+    }
+  ]
+}
