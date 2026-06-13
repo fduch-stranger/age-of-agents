@@ -79,7 +79,14 @@ export function SidePanel() {
   const now = Date.now();
   const st = STATE_STYLE[hero.state];
   const job = hero.state === 'working' ? hero.toolDetail ?? hero.currentTool : undefined;
-  const jobBuilding = hero.state === 'working' ? buildingText(themeId, toolToBuilding(hero.currentTool, hero.toolDetail), lang).label : undefined;
+  // Destynacja: dokąd jednostka zmierza na mapie (praca → budynek narzędzia; powrót → Twierdza).
+  const destId: BuildingId | undefined =
+    hero.state === 'working'
+      ? toolToBuilding(hero.currentTool, hero.toolDetail)
+      : hero.state === 'returning'
+        ? 'citadel'
+        : undefined;
+  const destination = destId ? buildingText(themeId, destId, lang).label : undefined;
 
   return (
     <div className="hud-panel sidepanel">
@@ -115,7 +122,7 @@ export function SidePanel() {
         <span>
           <b style={{ color: st.color }}>{t.states[hero.state]}</b>
           {job ? <span style={{ opacity: 0.85 }}> · {clip(job, 44)}</span> : null}
-          {jobBuilding ? <span style={{ opacity: 0.6 }}> · {jobBuilding}</span> : null}
+          {destination ? <span style={{ opacity: 0.6 }}> → {destination}</span> : null}
         </span>
       </div>
 

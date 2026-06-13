@@ -351,8 +351,8 @@ export class GameView {
       seen.add(peon.agentId);
       let unit = this.units.get(peon.agentId);
       if (!unit) {
-        const parent = this.units.get(peon.parentSessionId);
-        const start = parent ? { gx: parent.gx, gy: parent.gy } : this.building('barracks').door;
+        // Minioni rekrutowani z Hangaru (Koszar) — wychodzą z drzwi i biegną do pracy.
+        const start = this.building('barracks').door;
         unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection, getPeonSheet());
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
