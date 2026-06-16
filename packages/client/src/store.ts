@@ -4,6 +4,7 @@ import type {
   HeroSnapshot,
   MissionSnapshot,
   PeonSnapshot,
+  ProjectArsenal,
   ProjectIntel,
   TranscriptLine,
 } from '@agent-citadel/shared';
@@ -28,6 +29,8 @@ interface WorldStore {
    * serwer jeszcze nie wysłał żadnego update dla tego katalogu.
    */
   projectIntel: Record<string, ProjectIntel>;
+  /** Statyczny Arsenał per projectDir (Źródło A). */
+  arsenal: Record<string, ProjectArsenal>;
   /**
    * Wybrany projekt (miasto). `undefined` = pokaż wszystkie (overlay).
    * Wpływa na panel boczny: Architect Hall pokazuje tylko wybrany projekt,
@@ -64,6 +67,7 @@ export const useWorld = create<WorldStore>((set) => ({
   notifications: [],
   autofollow: false,
   projectIntel: {},
+  arsenal: {},
   setConnected: (connected) => set({ connected }),
   // Wybór jednostki i budynku wzajemnie się wykluczają (jeden panel po prawej).
   // Reset autofollow tylko przy ZMIANIE celu (opt-in per agent): ponowny klik w już
@@ -135,6 +139,9 @@ export const useWorld = create<WorldStore>((set) => ({
           return {
             projectIntel: { ...state.projectIntel, [event.intel.projectDir]: event.intel },
           };
+        }
+        case 'arsenal-updated': {
+          return { arsenal: { ...state.arsenal, [event.arsenal.projectDir]: event.arsenal } };
         }
         default:
           return state;

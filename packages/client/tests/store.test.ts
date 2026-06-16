@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { useWorld } from '../src/store';
+import type { ProjectArsenal } from '@agent-citadel/shared';
 
 beforeEach(() => {
   useWorld.setState({ autofollow: false, selectedSessionId: undefined, selectedBuildingId: undefined, heroes: {} });
@@ -58,5 +59,16 @@ describe('autofollow w store', () => {
     useWorld.getState().apply({ type: 'hero-removed', sessionId: 'hero-2' });
     expect(useWorld.getState().selectedSessionId).toBe('hero-1');
     expect(useWorld.getState().autofollow).toBe(true);
+  });
+});
+
+function arsenal(over: Partial<ProjectArsenal>): ProjectArsenal {
+  return { projectDir: 'PD', projectName: 'p', activeSessions: 1, skills: [], connectors: [], hooks: [], agents: [], refreshedAt: 1, ...over };
+}
+
+describe('store arsenal-updated', () => {
+  it('zapisuje arsenał per projectDir', () => {
+    useWorld.getState().apply({ type: 'arsenal-updated', arsenal: arsenal({ projectDir: 'PD' }) });
+    expect(useWorld.getState().arsenal['PD']?.projectName).toBe('p');
   });
 });
