@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState, useEffect, type ReactNode } from 'react';
 import { useWorld } from '../store';
 import { useUi } from '../i18n';
+import { useMenuKeyboard } from './useMenuKeyboard';
 import type { AgentKind, HeroStateKind } from '@agent-citadel/shared';
 
 const AGENT_BADGE: Record<AgentKind, { label: string; color: string } | undefined> = {
@@ -79,6 +80,7 @@ export function ProjectSwitcher() {
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   const cities = useMemo<Map<string, CityInfo>>(() => {
     const acc = new Map<string, CityInfo>();
@@ -133,6 +135,9 @@ export function ProjectSwitcher() {
       selectProject(undefined);
     }
   }, [connected, heroes, selected, cities, selectProject]);
+
+  // Nawigacja klawiaturą wewnątrz rozwiniętej listy (ArrowUp/Down/Home/End + focus po otwarciu).
+  useMenuKeyboard(open, menuRef);
 
   // Pokaż TYLKO miasta z aktywnymi sesjami (count > 0).
   const activeCities = [...cities.values()].filter((c) => c.count > 0);
@@ -222,7 +227,7 @@ export function ProjectSwitcher() {
 
       {/* ── Rozwijana lista miast ── */}
       {open && (
-        <div className="hud-panel px proj-dropdown" id="proj-city-menu" role="menu" aria-label={t.cities}>
+        <div ref={menuRef} className="hud-panel px proj-dropdown" id="proj-city-menu" role="menu" aria-label={t.cities}>
           <OptionRow
             icon="🌍"
             label={t.allCities}
