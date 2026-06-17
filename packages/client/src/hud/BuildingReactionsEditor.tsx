@@ -11,6 +11,7 @@ import { useUi, buildingText, type UiStrings } from '../i18n';
 import { useWorld } from '../store';
 import { computeCoverage } from '../coverage';
 import { parseTriggers } from '../mapping-edit';
+import { parseUploadedMapping, downloadMapping } from './mapping-io';
 
 /** Budynki „robocze" (cel narzędzi). citadel = dom/fallback, ale pozwalamy mu na własne reguły. */
 const WORKING_BUILDINGS: BuildingId[] = [
@@ -335,6 +336,7 @@ function JsonEditor({
   const [error, setError] = useState<string | undefined>();
   const focused = useRef(false);
   const applyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Gdy mapa zmieni się z panelu (chipy), odśwież textarea — ale nie podczas pisania.
   useEffect(() => {
@@ -380,6 +382,29 @@ function JsonEditor({
         onBlur={() => (focused.current = false)}
         onChange={(e) => onChange(e.target.value)}
       />
+      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <button className="ghost" onClick={() => downloadMapping(mapping)}>{t.downloadJson}</button>
+        <button className="ghost" onClick={() => fileRef.current?.click()}>{t.uploadJson}</button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = ''; // pozwól wgrać ten sam plik ponownie
+            if (!file) return;
+            const res = parseUploadedMapping(await file.text());
+            if (res.ok) {
+              setError(undefined);
+              setText(JSON.stringify(res.config, null, 2));
+              setMapping(res.config);
+            } else {
+              setError(t.jsonInvalid);
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }
