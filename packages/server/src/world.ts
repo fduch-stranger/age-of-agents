@@ -46,8 +46,8 @@ export class World {
   }
 
   /** Zwraca unikalne, aktywne katalogi projektów (w tej chwili pracujących sesji).
-   * Używane przez project-intel-poller do wykrycia, dla których katalogów
-   * czytać `.beads/` i `graphify-out/`. */
+   * Używane przez ArsenalPoller do wykrycia, dla których katalogów
+   * czytać konfigurację arsenału. */
   activeProjectDirs(): string[] {
     const dirs = new Set<string>();
     for (const hero of this.heroes.values()) {
@@ -111,7 +111,7 @@ export class World {
     this.emit(line);
   }
 
-  /** Publiczny emit dla zdarzeń niestandardowych (np. project-intel-updated
+  /** Publiczny emit dla zdarzeń niestandardowych (np. arsenal-updated
    * z pollerów, które nie są źródłem agentów). */
   emitCustom(event: GameEvent): void {
     this.emit(event);

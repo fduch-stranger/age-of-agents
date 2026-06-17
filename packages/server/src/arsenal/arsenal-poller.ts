@@ -23,7 +23,7 @@ function fingerprint(a: ProjectArsenal): string {
 
 /**
  * Czyta statyczny „Arsenał" (skille/MCP/hooki/subagenci) z każdego aktywnego projektu
- * i emituje `arsenal-updated`. Zastępuje ProjectIntelPoller (beads/graphify).
+ * i emituje `arsenal-updated`.
  */
 export class ArsenalPoller {
   private cache = new Map<string, CacheEntry>();

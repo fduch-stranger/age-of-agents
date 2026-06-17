@@ -120,7 +120,7 @@ describe('SessionTracker', () => {
 
   it('meta zapisuje pełny workingDir (cwd) obok projectName=basename', () => {
     // Regresja: dla źródła Claude projectDir to zakodowana nazwa folderu, NIE ścieżka.
-    // Poller intelu czyta .beads z workingDir, więc cwd musi trafić do snapshotu w całości.
+    // ArsenalPoller czyta config z workingDir, więc cwd musi trafić do snapshotu w całości.
     const world = new World();
     const tracker = new SessionTracker(world, 'sesja-cwd', '-Users-mpawelczuk-RTS-agents');
     tracker.apply({ kind: 'meta', cwd: '/Users/mpawelczuk/RTS agents' });

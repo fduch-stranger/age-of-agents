@@ -50,7 +50,7 @@ export class SessionTracker {
   private explicitTitle?: string; // jawny tytuł z CLI (custom-title/ai-title), jeśli wersja Claude go zapisze
   private firstSubstantialPrompt?: string; // pierwszy SENSOWNY prompt (nie "ok"/"dawaj") — stabilna nazwa
   private projectName?: string; // basename cwd, np. "RTS agents"
-  private workingDir?: string; // pełny cwd z transkryptu — realna ścieżka do .beads/graphify
+  private workingDir?: string; // pełny cwd z transkryptu — realna ścieżka do konfiguracji arsenału
   private recentActions: ActionEntry[] = []; // ostatnie narzędzia, najnowsze pierwsze (oś aktywności w panelu)
   private wieldedSkills = new Set<string>();
   private wieldedConnectors = new Set<string>();

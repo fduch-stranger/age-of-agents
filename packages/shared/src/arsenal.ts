@@ -31,7 +31,7 @@ export interface ArsenalAgent {
   origin: ArsenalOrigin;
 }
 
-/** Źródło A — statyczny ekwipunek jednego miasta (zastąpi ProjectIntel). */
+/** Źródło A — statyczny ekwipunek jednego miasta. */
 export interface ProjectArsenal {
   projectDir: string;
   projectName: string;
