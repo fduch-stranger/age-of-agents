@@ -27,6 +27,11 @@ const STALE_SESSION_MS = 5 * 60_000;
  * rosnąć w pamięci w nieskończoność. = HISTORICAL_WINDOW_MS. */
 const SESSION_RETENTION_MS = HISTORICAL_WINDOW_MS;
 
+function isSchemaMismatchError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /no such column/i.test(message) || /has no column named/i.test(message);
+}
+
 interface SessionState {
   tracker: SessionTracker;
   lastPartTime: number;
@@ -132,7 +137,15 @@ export class OpenCodePoller {
       // Usuń sesje starsze niż okno retencji, by nie rosnąć w pamięci
       this.sweep();
     } catch (err) {
-      console.error('[OpenCode] Poll error:', err);
+      if (isSchemaMismatchError(err)) {
+        // Niezgodność schematu (np. nowsza wersja OpenCode usunęła kolumny z `session`)
+        // nie naprawi się sama przy kolejnym pollu — zatrzymaj pollera zamiast
+        // logować ten sam błąd co sekundę w nieskończoność.
+        console.warn('[OpenCode] Poll error, stopping poller:', err instanceof Error ? err.message : String(err));
+        await this.stop();
+        return;
+      }
+      console.warn('[OpenCode] Poll error:', err instanceof Error ? err.message : String(err));
     }
   }
 
