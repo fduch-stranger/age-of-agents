@@ -2,6 +2,7 @@ import type { AgentKind } from '@agent-citadel/shared';
 import type { Fact } from '../transcript/facts.js';
 
 export type { AgentKind };
+export type SourceId = AgentKind;
 
 /** Wynik klasyfikacji pliku przez źródło: sesja (bohater), subagent (peon) lub nieistotny. */
 export interface ClassifiedFile {
