@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import type { Fact } from '../transcript/facts.js';
+import { parseCodexLookbackDays } from './config.js';
 import type { AgentSource, ClassifiedFile } from './types.js';
 
 /** Skraca tekst (jak w parserze Claude). */
@@ -10,6 +11,12 @@ function clip(text: string, max = 240): string {
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
 
 const UUID_RE = /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+const CODEX_RUNTIME_LOOKAHEAD_DAYS = 7;
+const pad2 = (n: number): string => String(n).padStart(2, '0');
+
+function codexDateRoot(base: string, date: Date): string {
+  return join(base, String(date.getFullYear()), pad2(date.getMonth() + 1), pad2(date.getDate()));
+}
 
 /* ─────────────────────────────────────────────────────────────────
  * PUNKT DOSTROJENIA 1 — heurystyka „prawdziwy prompt vs. wstrzyknięcia".
@@ -195,9 +202,25 @@ export function interpretCodexLine(line: string): Fact[] {
  * Źródło Codex: ~/.codex/sessions/RRRR/MM/DD/rollout-<ts>-<uuid>.jsonl.
  * Ścieżka koduje DATĘ, nie projekt — projectName bierze się z cwd w session_meta.
  */
+export function codexSessionRoots(
+  base = join(homedir(), '.codex', 'sessions'),
+  now = new Date(),
+  lookbackDays?: number,
+  lookaheadDays = 1,
+): string[] {
+  const roots: string[] = [];
+  const resolvedLookbackDays = lookbackDays ?? parseCodexLookbackDays();
+  for (let offset = -resolvedLookbackDays; offset <= lookaheadDays; offset++) {
+    const date = new Date(now);
+    date.setDate(now.getDate() + offset);
+    roots.push(codexDateRoot(base, date));
+  }
+  return roots;
+}
+
 export const codexSource: AgentSource = {
   id: 'codex',
-  roots: () => [join(homedir(), '.codex', 'sessions')],
+  roots: () => codexSessionRoots(join(homedir(), '.codex', 'sessions'), new Date(), undefined, CODEX_RUNTIME_LOOKAHEAD_DAYS),
   depth: 6,
   classify(path: string): ClassifiedFile {
     const file = path.split('/').pop() ?? '';

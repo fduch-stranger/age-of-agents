@@ -1,5 +1,6 @@
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { interpretCodexLine, codexSource, isCodexHumanPrompt, codexToolToCanonical } from '../src/sources/codex.js';
+import { interpretCodexLine, codexSource, isCodexHumanPrompt, codexToolToCanonical, codexSessionRoots } from '../src/sources/codex.js';
 
 const line = (obj: unknown) => JSON.stringify(obj);
 
@@ -76,5 +77,31 @@ describe('codexSource.classify', () => {
   });
   it('plik nie-rollout → other', () => {
     expect(codexSource.classify(`${root}/2026/02/07/notes.jsonl`, root).kind).toBe('other');
+  });
+});
+
+describe('codexSessionRoots', () => {
+  it('scopes watching to recent date folders instead of the whole sessions tree', () => {
+    const roots = codexSessionRoots('/Users/x/.codex/sessions', new Date(2026, 5, 19, 12), 1);
+    expect(roots).toEqual([
+      join('/Users/x/.codex/sessions', '2026', '06', '18'),
+      join('/Users/x/.codex/sessions', '2026', '06', '19'),
+      join('/Users/x/.codex/sessions', '2026', '06', '20'),
+    ]);
+  });
+
+  it('can include a bounded future window for runtime watchers', () => {
+    const roots = codexSessionRoots('/Users/x/.codex/sessions', new Date(2026, 5, 19, 12), 1, 7);
+    expect(roots).toEqual([
+      join('/Users/x/.codex/sessions', '2026', '06', '18'),
+      join('/Users/x/.codex/sessions', '2026', '06', '19'),
+      join('/Users/x/.codex/sessions', '2026', '06', '20'),
+      join('/Users/x/.codex/sessions', '2026', '06', '21'),
+      join('/Users/x/.codex/sessions', '2026', '06', '22'),
+      join('/Users/x/.codex/sessions', '2026', '06', '23'),
+      join('/Users/x/.codex/sessions', '2026', '06', '24'),
+      join('/Users/x/.codex/sessions', '2026', '06', '25'),
+      join('/Users/x/.codex/sessions', '2026', '06', '26'),
+    ]);
   });
 });

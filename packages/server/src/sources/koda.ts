@@ -1,6 +1,7 @@
 import { homedir } from 'node:os';
 import { basename, join, sep } from 'node:path';
 import type { Fact } from '../transcript/facts.js';
+import { rootIfExists } from './config.js';
 import type { AgentSource, ClassifiedFile } from './types.js';
 
 /**
@@ -266,7 +267,7 @@ function decodeKodaDir(encoded: string): string {
  */
 export const kodaSource: AgentSource = {
   id: 'koda',
-  roots: () => [join(homedir(), '.koda', 'agent', 'sessions')],
+  roots: () => rootIfExists(join(homedir(), '.koda', 'agent', 'sessions')),
   depth: 4,
   classify(path: string, root: string): ClassifiedFile {
     const rel = path.slice(root.length + 1);
