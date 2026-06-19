@@ -19,7 +19,7 @@ import { peonSpawnScatter, heroSpawnScatter } from './scatter';
 import { buildTerrainMap } from './terrain-map';
 import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './building-fx';
 import { buildingText } from '../i18n';
-import { homeBuilding } from './home-building';
+import { homeBuilding, awaitingBuilding } from './home-building';
 import type { Lang } from '../settings';
 
 /** Docelowa szerokość dekoracji w kaflach (do skalowania sprite'a). */
@@ -671,8 +671,12 @@ export class GameView {
       // ⇒ pusta ścieżka ⇒ stoi. Kieruj go do Koszar, żeby faktycznie biegł.
       if (buildingId === 'citadel' && unit.isPeon) buildingId = 'barracks';
       this.lastBuilding.set(unit.id, buildingId); // zapamiętaj warsztat — tu jednostka zostaje między zadaniami
-    } else if (!unit.isPeon && (state === 'thinking' || state === 'awaiting-input' || state === 'error')) {
-      this.targets.delete(unit.id); // bohater: zostań gdzie jesteś (myśli przy swoim warsztacie)
+    } else if (!unit.isPeon && state === 'awaiting-input') {
+      // Czeka na usera → idzie do kaplicy/poczekalni. NIE nadpisujemy lastBuilding,
+      // by po odpowiedzi wrócił do swojego warsztatu (idle → ostatni warsztat).
+      buildingId = awaitingBuilding(this.theme.id);
+    } else if (!unit.isPeon && (state === 'thinking' || state === 'error')) {
+      this.targets.delete(unit.id); // bohater: zostań gdzie jesteś (myśli przy warsztacie)
       return;
     } else {
       // idle/sleeping/returning: NIE wracaj do Twierdzy — zostań przy OSTATNIM warsztacie.

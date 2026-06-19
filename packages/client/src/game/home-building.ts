@@ -18,6 +18,13 @@ const HOME_BUILDINGS: Record<string, BuildingId[]> = {
   scifi: ['holodeck', 'mess', 'hydroponics', 'lounge', 'medbay'],
 };
 
+/** Budynek „poczekalni", do którego idzie bohater czekający na usera (awaiting-input).
+ *  fantasy: kaplica (shrine); sci-fi: poczekalnia (lounge); fallback: citadel. */
+const AWAITING_BY_THEME: Record<string, BuildingId> = { fantasy: 'shrine', scifi: 'lounge' };
+export function awaitingBuilding(themeId: string): BuildingId {
+  return AWAITING_BY_THEME[themeId] ?? 'citadel';
+}
+
 /** djb2 — veloce, deterministico, sufficiente per spalmare 100+ progetti. */
 function projectHash(s: string): number {
   let h = 5381;

@@ -84,6 +84,8 @@ export interface UiStrings {
   jsonSynced: string;
   jsonInvalid: string;
   restoreDefaults: string;
+  downloadJson: string;
+  uploadJson: string;
   addCondition: string;
   addPattern: string;
   toolName: string;
@@ -194,6 +196,8 @@ const EN: UiStrings = {
   jsonSynced: 'JSON — kept in sync with the panel',
   jsonInvalid: 'Invalid config — not applied',
   restoreDefaults: 'Restore defaults',
+  downloadJson: '⬇ Download JSON',
+  uploadJson: '⬆ Upload JSON',
   addCondition: '+ condition',
   addPattern: '+ pattern',
   toolName: 'tool',
@@ -303,6 +307,8 @@ const PL: UiStrings = {
   jsonSynced: 'JSON — synchronizowany z panelem',
   jsonInvalid: 'Niepoprawny config — niezastosowany',
   restoreDefaults: 'Przywróć domyślne',
+  downloadJson: '⬇ Pobierz JSON',
+  uploadJson: '⬆ Wgraj JSON',
   addCondition: '+ warunek',
   addPattern: '+ wzorzec',
   toolName: 'narzędzie',
@@ -412,6 +418,8 @@ const IT: UiStrings = {
   jsonSynced: 'JSON — sincronizzato con il pannello',
   jsonInvalid: 'Config non valido — non applicato',
   restoreDefaults: 'Ripristina predefiniti',
+  downloadJson: '⬇ Scarica JSON',
+  uploadJson: '⬆ Carica JSON',
   addCondition: '+ condizione',
   addPattern: '+ pattern',
   toolName: 'strumento',
