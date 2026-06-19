@@ -14,6 +14,7 @@ import {
 import { useModels } from '../model-store';
 import { useWorld } from '../store';
 import { useUi, type UiStrings } from '../i18n';
+import { parseUploadedModelConfig, downloadModelConfig } from './model-io';
 import { formatK } from '../util';
 
 export function ModelRegistryEditor() {
@@ -221,6 +222,7 @@ function ModelJsonEditor({ models, setModels, t }: { models: ModelConfig; setMod
   const [error, setError] = useState<string | undefined>();
   const focused = useRef(false);
   const applyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   // Gdy rejestr zmieni się z panelu, odśwież textarea — ale nie podczas pisania.
   useEffect(() => {
@@ -264,6 +266,30 @@ function ModelJsonEditor({ models, setModels, t }: { models: ModelConfig; setMod
         onBlur={() => (focused.current = false)}
         onChange={(e) => onChange(e.target.value)}
       />
+      {/* Pobierz/wgraj plik JSON — bliźniaczo do sekcji budynków (mapping-io). */}
+      <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+        <button className="ghost" onClick={() => downloadModelConfig(models)}>{t.downloadJson}</button>
+        <button className="ghost" onClick={() => fileRef.current?.click()}>{t.uploadJson}</button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          style={{ display: 'none' }}
+          onChange={async (e) => {
+            const file = e.target.files?.[0];
+            e.target.value = ''; // pozwól wgrać ten sam plik ponownie
+            if (!file) return;
+            const res = parseUploadedModelConfig(await file.text());
+            if (res.ok) {
+              setError(undefined);
+              setText(JSON.stringify(res.config, null, 2));
+              setModels(res.config);
+            } else {
+              setError(t.jsonInvalid);
+            }
+          }}
+        />
+      </div>
     </div>
   );
 }
