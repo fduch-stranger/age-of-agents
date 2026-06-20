@@ -142,7 +142,21 @@ export function interpretCodexLine(line: string): Fact[] {
 
   switch (record.type) {
     case 'session_meta':
-      if (payload) facts.push({ kind: 'meta', cwd: str(payload.cwd), model: str(payload.model) ?? str(payload.model_provider) });
+      if (payload) {
+        if (payload.thread_source === 'subagent') {
+          const agentId = str(payload.id);
+          const parentSessionId = str(payload.parent_thread_id) ?? str(payload.source?.subagent?.thread_spawn?.parent_thread_id);
+          if (agentId && parentSessionId) {
+            facts.push({
+              kind: 'subagent-meta',
+              agentId,
+              parentSessionId,
+              description: str(payload.agent_nickname) ?? str(payload.agent_role),
+            });
+          }
+        }
+        facts.push({ kind: 'meta', cwd: str(payload.cwd), model: str(payload.model) ?? str(payload.model_provider) });
+      }
       break;
 
     case 'turn_context': {

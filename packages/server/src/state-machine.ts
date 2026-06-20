@@ -159,6 +159,9 @@ export class SessionTracker {
         });
         break;
 
+      case 'subagent-meta':
+        break;
+
       case 'thinking':
         if (!this.inErrorFlash()) this.patch({ state: 'thinking', currentTool: undefined, toolDetail: undefined }, fact.ts);
         break;

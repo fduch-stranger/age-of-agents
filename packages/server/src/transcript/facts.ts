@@ -7,6 +7,7 @@ export type Fact =
   | { kind: 'prompt'; text: string; ts: string }
   | { kind: 'title'; title: string; ts?: string }
   | { kind: 'meta'; model?: string; gitBranch?: string; permissionMode?: string; cwd?: string; ts?: string }
+  | { kind: 'subagent-meta'; agentId: string; parentSessionId: string; description?: string }
   | { kind: 'thinking'; ts: string }
   | { kind: 'assistant-text'; text: string; ts: string }
   | { kind: 'tool-start'; tool: string; detail?: string; messageId: string; ts: string }

@@ -12,6 +12,31 @@ describe('interpretCodexLine', () => {
     expect(facts).toContainEqual({ kind: 'meta', cwd: '/Users/x/proj', model: 'openai' });
   });
 
+  it('session_meta subagenta Codeksa zachowuje relację do rodzica', () => {
+    const facts = interpretCodexLine(
+      line({
+        type: 'session_meta',
+        timestamp: '2026-06-19T20:14:29.437Z',
+        payload: {
+          id: '019ee185-46ea-7311-bd5a-e77aa01e71f6',
+          parent_thread_id: '019ee169-858c-76c3-a9d4-044415be1369',
+          thread_source: 'subagent',
+          agent_nickname: 'Leibniz',
+          agent_role: 'worker',
+          cwd: '/Users/x/proj',
+          model_provider: 'openai',
+        },
+      }),
+    );
+    expect(facts).toContainEqual({
+      kind: 'subagent-meta',
+      agentId: '019ee185-46ea-7311-bd5a-e77aa01e71f6',
+      parentSessionId: '019ee169-858c-76c3-a9d4-044415be1369',
+      description: 'Leibniz',
+    });
+    expect(facts).toContainEqual({ kind: 'meta', cwd: '/Users/x/proj', model: 'openai' });
+  });
+
   it('prawdziwy prompt usera → fakt prompt; wstrzyknięcia → nic', () => {
     const userMsg = (text: string) =>
       interpretCodexLine(line({ type: 'response_item', timestamp: '2026-06-14T10:00:00.000Z', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }));
