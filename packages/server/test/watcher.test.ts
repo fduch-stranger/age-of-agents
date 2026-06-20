@@ -61,7 +61,7 @@ describe('SourceWatcher - subagents from source metadata', () => {
       expect(() => watcher.start()).not.toThrow();
       await watcher.stop();
       expect(chokidarWatchSpy).not.toHaveBeenCalled();
-      expect(world.snapshot()).toEqual({ heroes: [], peons: [], missions: [] });
+      expect(world.snapshot()).toEqual({ heroes: [], peons: [], missions: [], transcripts: [] });
     } finally {
       chokidarWatchSpy.mockClear();
     }

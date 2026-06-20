@@ -39,4 +39,31 @@ describe('World.emit - resilience to failing listeners', () => {
 
     errSpy.mockRestore();
   });
+
+  it('stores recent transcript lines in snapshots', () => {
+    const world = new World();
+    world.emitTranscriptLine({
+      type: 'transcript-line',
+      line: {
+        sessionId: 's1',
+        role: 'user',
+        text: 'Fix Codex support',
+        ts: '2026-06-20T12:00:00.000Z',
+      },
+    });
+    world.emitTranscriptLine({
+      type: 'transcript-line',
+      line: {
+        sessionId: 's1',
+        role: 'assistant',
+        text: 'I will inspect the parser',
+        ts: '2026-06-20T12:00:01.000Z',
+      },
+    });
+
+    expect(world.snapshot().transcripts).toEqual([
+      { sessionId: 's1', role: 'user', text: 'Fix Codex support', ts: '2026-06-20T12:00:00.000Z' },
+      { sessionId: 's1', role: 'assistant', text: 'I will inspect the parser', ts: '2026-06-20T12:00:01.000Z' },
+    ]);
+  });
 });

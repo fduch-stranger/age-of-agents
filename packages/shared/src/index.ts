@@ -81,6 +81,7 @@ export interface WorldSnapshot {
   heroes: HeroSnapshot[];
   peons: PeonSnapshot[];
   missions: MissionSnapshot[];
+  transcripts: TranscriptLine[];
 }
 
 /** Transcript line for the side panel: a summary, not the full content. */

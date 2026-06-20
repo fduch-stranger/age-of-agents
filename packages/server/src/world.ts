@@ -3,10 +3,12 @@ import type {
   HeroSnapshot,
   MissionSnapshot,
   PeonSnapshot,
+  TranscriptLine,
   WorldSnapshot,
 } from '@agent-citadel/shared';
 
 type Listener = (event: GameEvent) => void;
+const TRANSCRIPT_BUFFER = 200;
 
 /**
  * In-memory world state. The only server-side source of truth: watcher, hooks,
@@ -17,6 +19,7 @@ export class World {
   private heroes = new Map<string, HeroSnapshot>();
   private peons = new Map<string, PeonSnapshot>();
   private missions = new Map<string, MissionSnapshot>();
+  private transcripts: TranscriptLine[] = [];
   private listeners = new Set<Listener>();
   private nextTeamColor = 0;
 
@@ -42,6 +45,7 @@ export class World {
       heroes: [...this.heroes.values()],
       peons: [...this.peons.values()],
       missions: [...this.missions.values()],
+      transcripts: this.transcripts,
     };
   }
 
@@ -107,6 +111,7 @@ export class World {
   }
 
   emitTranscriptLine(line: GameEvent & { type: 'transcript-line' }): void {
+    this.transcripts = [...this.transcripts, line.line].slice(-TRANSCRIPT_BUFFER);
     this.emit(line);
   }
 

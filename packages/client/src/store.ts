@@ -83,6 +83,14 @@ export const useWorld = create<WorldStore>((set) => ({
             heroes: Object.fromEntries(event.heroes.map((h) => [h.sessionId, h])),
             peons: Object.fromEntries(event.peons.map((p) => [p.agentId, p])),
             missions: Object.fromEntries(event.missions.map((m) => [m.id, m])),
+            transcripts: Object.fromEntries(
+              (event.transcripts ?? []).reduce((acc, line) => {
+                const lines = acc.get(line.sessionId) ?? [];
+                lines.push(line);
+                acc.set(line.sessionId, lines.slice(-TRANSCRIPT_BUFFER));
+                return acc;
+              }, new Map<string, TranscriptLine[]>()),
+            ),
           };
         case 'hero-spawned':
         case 'hero-updated': {
