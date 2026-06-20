@@ -69,6 +69,8 @@ export class SourceWatcher {
       depth: this.source.depth ?? 6,
       ignoreInitial: false,
       alwaysStat: true,
+      usePolling: true,
+      interval: 1_000,
       // Ignorujemy tylko POTWIERDZONE pliki bez .jsonl (bez stats nie wolno —
       // ucięlibyśmy traversal drzewa).
       ignored: (path, stats) => stats?.isFile() === true && !path.endsWith('.jsonl'),

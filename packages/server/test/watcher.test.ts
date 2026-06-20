@@ -67,6 +67,34 @@ describe('SourceWatcher — subagenci z metadanych źródła', () => {
     }
   });
 
+  it('uses polling for transcript roots to avoid native watcher exhaustion', async () => {
+    chokidarWatchSpy.mockClear();
+    const fakeWatcher = {
+      add: vi.fn(),
+      close: vi.fn(),
+      on: vi.fn().mockReturnThis(),
+    };
+    chokidarWatchSpy.mockReturnValueOnce(fakeWatcher as unknown as ReturnType<typeof import('chokidar').watch>);
+    const source: AgentSource = {
+      id: 'codex',
+      roots: () => ['/virtual/codex/sessions/2026/06/20'],
+      classify: () => ({ kind: 'other' }),
+      parseLine: () => [],
+    };
+    const watcher = new SourceWatcher(new World(), source, DEFAULT_THRESHOLDS);
+
+    try {
+      watcher.start();
+      expect(chokidarWatchSpy).toHaveBeenCalledWith(
+        ['/virtual/codex/sessions/2026/06/20'],
+        expect.objectContaining({ usePolling: true, interval: 1_000 }),
+      );
+    } finally {
+      await watcher.stop();
+      chokidarWatchSpy.mockClear();
+    }
+  });
+
   it('plik sklasyfikowany jako sesja może zostać przekierowany do peona po subagent-meta', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'aoa-watcher-'));
     const world = new World();
