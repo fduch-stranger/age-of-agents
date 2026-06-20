@@ -408,6 +408,10 @@ export function resolveModel(model: string | undefined, cfg: ModelConfig): Resol
  */
 export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   sprites: [
+    { match: { kind: 'exact', id: 'gpt-5.5' }, sprite: 'fable', displayName: 'GPT-5.5' },
+    { match: { kind: 'pattern', pattern: 'gpt-5.4-codex' }, sprite: 'fable', displayName: 'GPT-5.4 Codex' },
+    { match: { kind: 'pattern', pattern: 'gpt-5.4-mini' }, sprite: 'haiku', displayName: 'GPT-5.4 Mini' },
+    { match: { kind: 'pattern', pattern: 'gpt-' }, sprite: 'fable', displayName: 'GPT' },
     { match: { kind: 'pattern', pattern: 'opus' }, sprite: 'opus', displayName: 'Opus 4.8' },
     { match: { kind: 'pattern', pattern: 'sonnet' }, sprite: 'sonnet', displayName: 'Sonnet 4.6' },
     { match: { kind: 'pattern', pattern: 'haiku' }, sprite: 'haiku', displayName: 'Haiku 4.5' },
@@ -415,6 +419,9 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   ],
   windows: [
     { match: { kind: 'pattern', pattern: '[1m]' }, contextWindow: 1_000_000 }, // explicit 1M tag beats base model
+    { match: { kind: 'exact', id: 'gpt-5.5' }, contextWindow: 258_400 },
+    { match: { kind: 'pattern', pattern: 'gpt-5.4' }, contextWindow: 258_400 },
+    { match: { kind: 'pattern', pattern: 'gpt-' }, contextWindow: 258_400 },
     { match: { kind: 'pattern', pattern: 'opus' }, contextWindow: 1_000_000 }, // Opus 4.6/4.7/4.8 = 1M
     { match: { kind: 'pattern', pattern: 'sonnet' }, contextWindow: 1_000_000 }, // Sonnet 4.6 = 1M
     { match: { kind: 'pattern', pattern: 'haiku' }, contextWindow: 200_000 }, // Haiku 4.5 = 200k

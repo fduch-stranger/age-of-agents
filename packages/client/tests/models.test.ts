@@ -43,6 +43,24 @@ describe('resolveModel - two axes at once', () => {
     expect(r.sprite).toBe('opus');
     expect(r.contextWindow).toBe(1_000_000);
   });
+
+  it('Codex/OpenAI model names resolve to non-Claude display names', () => {
+    expect(resolveModel('gpt-5.5', DEFAULT_MODEL_CONFIG)).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5.5',
+      contextWindow: 258_400,
+    });
+    expect(resolveModel('gpt-5.4-codex', DEFAULT_MODEL_CONFIG)).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5.4 Codex',
+      contextWindow: 258_400,
+    });
+    expect(resolveModel('gpt-5.4-mini', DEFAULT_MODEL_CONFIG)).toMatchObject({
+      sprite: 'haiku',
+      displayName: 'GPT-5.4 Mini',
+      contextWindow: 258_400,
+    });
+  });
 });
 
 describe('matching - first hit + case-insensitive', () => {
