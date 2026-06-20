@@ -37,6 +37,147 @@ describe('interpretCodexLine', () => {
     expect(facts).toContainEqual({ kind: 'meta', cwd: '/Users/x/proj', model: 'openai' });
   });
 
+  it('turn_context concrete model is preserved and session_meta provider is not treated as a model', () => {
+    expect(interpretCodexLine(line({
+      type: 'turn_context',
+      timestamp: '2026-06-20T11:59:55.986Z',
+      payload: { cwd: '/Users/x/age-of-agents', model: 'gpt-5.5' },
+    }))).toContainEqual({
+      kind: 'meta',
+      cwd: '/Users/x/age-of-agents',
+      model: 'gpt-5.5',
+    });
+
+    expect(interpretCodexLine(line({
+      type: 'session_meta',
+      timestamp: '2026-06-20T11:59:56.225Z',
+      payload: { cwd: '/Users/x/age-of-agents', model_provider: 'openai', thread_source: 'user' },
+    }))).toContainEqual({
+      kind: 'meta',
+      cwd: '/Users/x/age-of-agents',
+      model: undefined,
+    });
+  });
+
+  it('current Codex function_call names normalize to canonical game tools', () => {
+    const exec = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T12:00:10.084Z',
+      payload: {
+        type: 'function_call',
+        name: 'exec_command',
+        call_id: 'call-exec',
+        arguments: JSON.stringify({ cmd: 'npm test', workdir: '/repo' }),
+      },
+    }));
+    expect(exec).toContainEqual({
+      kind: 'tool-start',
+      tool: 'Bash',
+      detail: 'npm test',
+      messageId: 'call-exec',
+      ts: '2026-06-20T12:00:10.084Z',
+    });
+
+    const js = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T12:00:25.638Z',
+      payload: {
+        type: 'function_call',
+        name: 'js',
+        call_id: 'call-js',
+        arguments: JSON.stringify({ code: 'await page.title()' }),
+      },
+    }));
+    expect(js).toContainEqual({
+      kind: 'tool-start',
+      tool: 'mcp__node_repl__js',
+      detail: 'await page.title()',
+      messageId: 'call-js',
+      ts: '2026-06-20T12:00:25.638Z',
+    });
+
+    const plan = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T11:56:20.263Z',
+      payload: {
+        type: 'function_call',
+        name: 'update_plan',
+        call_id: 'call-plan',
+        arguments: JSON.stringify({ plan: [{ step: 'Inspect', status: 'in_progress' }] }),
+      },
+    }));
+    expect(plan.find((f) => f.kind === 'tool-start')).toMatchObject({
+      kind: 'tool-start',
+      tool: 'Workflow',
+      detail: 'Inspect',
+    });
+  });
+
+  it('current Codex custom/tool-search records become canonical tool-start facts', () => {
+    const patch = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T11:55:00.000Z',
+      payload: {
+        type: 'custom_tool_call',
+        name: 'apply_patch',
+        call_id: 'call-patch',
+        input: '*** Begin Patch\n*** Update File: packages/server/src/sources/codex.ts\n@@\n-a\n+b\n*** End Patch',
+      },
+    }));
+    expect(patch.find((f) => f.kind === 'tool-start')).toMatchObject({
+      kind: 'tool-start',
+      tool: 'Edit',
+      detail: 'codex.ts',
+    });
+
+    const search = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T12:00:20.394Z',
+      payload: { type: 'tool_search_call', call_id: 'call-search', query: 'browser control' },
+    }));
+    expect(search).toContainEqual({
+      kind: 'tool-start',
+      tool: 'ToolSearch',
+      detail: 'browser control',
+      messageId: 'call-search',
+      ts: '2026-06-20T12:00:20.394Z',
+    });
+  });
+
+  it('Codex token_count preserves cumulative totals and current context window', () => {
+    expect(interpretCodexLine(line({
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          model_context_window: 258400,
+          total_token_usage: {
+            input_tokens: 37049245,
+            cached_input_tokens: 35437952,
+            output_tokens: 178333,
+            reasoning_output_tokens: 24685,
+            total_tokens: 37227578,
+          },
+          last_token_usage: {
+            input_tokens: 180825,
+            cached_input_tokens: 179072,
+            output_tokens: 227,
+            reasoning_output_tokens: 98,
+            total_tokens: 181052,
+          },
+        },
+      },
+    }))).toContainEqual({
+      kind: 'usage-total',
+      input: 37049245,
+      output: 178333,
+      context: 258400,
+      cachedInput: 35437952,
+      reasoningOutput: 24685,
+      last: { input: 180825, output: 227, cachedInput: 179072, reasoningOutput: 98 },
+    });
+  });
+
   it('real user prompt -> prompt fact; injections -> nothing', () => {
     const userMsg = (text: string) =>
       interpretCodexLine(line({ type: 'response_item', timestamp: '2026-06-14T10:00:00.000Z', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }));
