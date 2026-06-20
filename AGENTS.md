@@ -46,6 +46,14 @@
   - Keep persisted config loading/upgrades in server/client config stores, not in UI components.
   - Preserve user-saved config compatibility when defaults change.
 
+- **Serena Memory Hygiene**:
+  - Treat source code and committed docs as the source of truth when memory conflicts with the repo.
+  - Update Serena memory after discovering durable project facts, architectural decisions, recurring gotchas, or workflow rules that future sessions would otherwise need to rediscover.
+  - Do not store secrets, tokens, credentials, personal data, temporary task status, raw logs, or large copied docs in memory.
+  - Keep memory entries concise, dated when useful, and linked to relevant repo files or docs.
+  - Prefer updating an existing memory over creating duplicates.
+  - Before final completion, consider whether significant code or workflow changes require a memory update.
+
 - **Execution & Validation**:
   - After code edits, use inspections/problems tools (`get_file_problems`) on touched TypeScript files when available.
   - Run focused tests before broad verification:
