@@ -9,7 +9,7 @@ describe('interpretCodexLine', () => {
     const facts = interpretCodexLine(
       line({ type: 'session_meta', timestamp: '2026-06-14T10:00:00.000Z', payload: { cwd: '/Users/x/proj', model_provider: 'openai' } }),
     );
-    expect(facts).toContainEqual({ kind: 'meta', cwd: '/Users/x/proj', model: 'openai' });
+    expect(facts).toContainEqual({ kind: 'meta', cwd: '/Users/x/proj', model: undefined });
   });
 
   it('Codex subagent session_meta preserves the parent relationship', () => {
@@ -34,7 +34,7 @@ describe('interpretCodexLine', () => {
       parentSessionId: '019ee169-858c-76c3-a9d4-044415be1369',
       description: 'Leibniz',
     });
-    expect(facts).toContainEqual({ kind: 'meta', cwd: '/Users/x/proj', model: 'openai' });
+    expect(facts).toContainEqual({ kind: 'meta', cwd: '/Users/x/proj', model: undefined });
   });
 
   it('turn_context concrete model is preserved and session_meta provider is not treated as a model', () => {

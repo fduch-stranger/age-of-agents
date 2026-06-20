@@ -44,18 +44,33 @@ export function codexToolToCanonical(name: string): string {
     case 'shell':
     case 'local_shell':
     case 'exec':
+    case 'exec_command':
+    case 'functions.exec_command':
       return 'Bash'; // kopalnia (git w argumentach → targ, jak u Claude)
     case 'apply_patch':
+    case 'functions.apply_patch':
       return 'Edit'; // forge
     case 'read_file':
     case 'view_image':
+    case 'functions.view_image':
       return 'Read'; // biblioteka
     case 'web_search':
+    case 'web.run':
+    case 'search_query':
+    case 'image_query':
       return 'WebSearch'; // tower
+    case 'tool_search_call':
+    case 'tool_search_tool':
+      return 'ToolSearch';
     case 'update_plan':
-      return 'update_plan'; // no mapping -> citadel
+    case 'functions.update_plan':
+    case 'multi_tool_use.parallel':
+      return 'Workflow';
+    case 'js':
+      return 'mcp__node_repl__js';
     default:
       // Codex MCP tools: 'server__tool' or 'server.tool'.
+      if (name.startsWith('mcp__')) return name;
       if (name.includes('__')) return `mcp__${name}`;
       if (name.includes('.')) return `mcp__${name.replace(/\./g, '__')}`;
       return name; // nieznane → twierdza (fallback w toolToBuilding)
@@ -69,25 +84,40 @@ function codexToolDetail(name: string, argumentsRaw: unknown): string | undefine
     try {
       args = JSON.parse(argumentsRaw);
     } catch {
-      return clip(argumentsRaw, 60);
+      if (name === 'apply_patch' || name === 'functions.apply_patch') args = { input: argumentsRaw };
+      else if (name === 'js') args = { input: argumentsRaw };
+      else if (name === 'tool_search_tool') args = { query: argumentsRaw };
+      else if (name === 'web_search') args = { query: argumentsRaw };
+      else if (name === 'web.run') args = { search_query: [{ q: argumentsRaw }] };
+      else return clip(argumentsRaw, 60);
     }
   } else if (argumentsRaw && typeof argumentsRaw === 'object') {
     args = argumentsRaw;
   } else {
     return undefined;
   }
-  if (name === 'shell' || name === 'local_shell' || name === 'exec') {
-    const cmd = Array.isArray(args.command) ? args.command.join(' ') : str(args.command);
+  if (name === 'shell' || name === 'local_shell' || name === 'exec' || name === 'exec_command' || name === 'functions.exec_command') {
+    const cmd = Array.isArray(args.command) ? args.command.join(' ') : str(args.command) ?? str(args.cmd);
     // skip typical 'bash -lc' wrapper to show the command essence
     return cmd ? clip(cmd.replace(/^bash\s+-lc\s+/, ''), 60) : undefined;
   }
   if (name === 'web_search') return str(args.query);
-  if (name === 'apply_patch') {
-    const patch = str(args.input) ?? '';
+  if (name === 'web.run') {
+    const q = args.search_query?.[0]?.q ?? args.image_query?.[0]?.q;
+    return str(q);
+  }
+  if (name === 'apply_patch' || name === 'functions.apply_patch') {
+    const patch = str(args.input) ?? str(args.patch) ?? '';
     const m = patch.match(/\*\*\* (?:Update|Add|Delete) File: (.+)/);
     return m ? m[1].split('/').pop() : undefined;
   }
-  return str(args.path) ?? str(args.file_path);
+  if (name === 'update_plan' || name === 'functions.update_plan') {
+    const first = Array.isArray(args.plan) ? args.plan[0] : undefined;
+    return str(first?.step);
+  }
+  if (name === 'js') return clip(str(args.code) ?? str(args.input) ?? '', 60) || undefined;
+  if (name === 'tool_search_tool') return str(args.query);
+  return str(args.path) ?? str(args.file_path) ?? str(args.query);
 }
 
 /** Whether function_call result indicates an error (best-effort; formats differ). */
@@ -101,13 +131,42 @@ function codexOutputIsError(output: unknown): boolean {
 }
 
 /** Extracts cumulative token usage from token_count payload (several shapes). */
-function extractCodexUsage(payload: any): { input: number; output: number } | undefined {
-  const u = payload?.info?.total_token_usage ?? payload?.total_token_usage ?? payload;
-  if (!u || typeof u !== 'object') return undefined;
-  const input = Number(u.input_tokens ?? u.input ?? 0);
-  const output = Number(u.output_tokens ?? u.output ?? 0);
+function extractCodexUsage(payload: any):
+  | {
+      input: number;
+      output: number;
+      context?: number;
+      cachedInput?: number;
+      reasoningOutput?: number;
+      last?: { input: number; output: number; cachedInput?: number; reasoningOutput?: number };
+    }
+  | undefined {
+  const info = payload?.info ?? payload;
+  const total = info?.total_token_usage ?? payload?.total_token_usage ?? payload;
+  if (!total || typeof total !== 'object') return undefined;
+
+  const input = Number(total.input_tokens ?? total.input ?? 0);
+  const output = Number(total.output_tokens ?? total.output ?? 0);
   if (!input && !output) return undefined;
-  return { input, output };
+
+  const lastRaw = info?.last_token_usage;
+  const last = lastRaw && typeof lastRaw === 'object'
+    ? {
+        input: Number(lastRaw.input_tokens ?? lastRaw.input ?? 0),
+        output: Number(lastRaw.output_tokens ?? lastRaw.output ?? 0),
+        ...(lastRaw.cached_input_tokens !== undefined ? { cachedInput: Number(lastRaw.cached_input_tokens) } : {}),
+        ...(lastRaw.reasoning_output_tokens !== undefined ? { reasoningOutput: Number(lastRaw.reasoning_output_tokens) } : {}),
+      }
+    : undefined;
+
+  return {
+    input,
+    output,
+    ...(typeof info?.model_context_window === 'number' ? { context: info.model_context_window } : {}),
+    ...(total.cached_input_tokens !== undefined ? { cachedInput: Number(total.cached_input_tokens) } : {}),
+    ...(total.reasoning_output_tokens !== undefined ? { reasoningOutput: Number(total.reasoning_output_tokens) } : {}),
+    ...(last ? { last } : {}),
+  };
 }
 
 function handleMessage(payload: any, ts: string, facts: Fact[]): void {
@@ -155,7 +214,8 @@ export function interpretCodexLine(line: string): Fact[] {
             });
           }
         }
-        facts.push({ kind: 'meta', cwd: str(payload.cwd), model: str(payload.model) ?? str(payload.model_provider) });
+        const model = str(payload.model);
+        facts.push({ kind: 'meta', cwd: str(payload.cwd), model });
       }
       break;
 
@@ -193,6 +253,34 @@ export function interpretCodexLine(line: string): Fact[] {
         case 'function_call_output':
           facts.push({ kind: 'tool-result', isError: codexOutputIsError(payload.output), ts });
           break;
+        case 'custom_tool_call': {
+          const name = str(payload.name);
+          if (name) {
+            facts.push({
+              kind: 'tool-start',
+              tool: codexToolToCanonical(name),
+              detail: codexToolDetail(name, payload.arguments ?? payload.input),
+              messageId: str(payload.call_id) ?? `codex-${ts}`,
+              ts,
+            });
+          }
+          break;
+        }
+        case 'custom_tool_call_output':
+          facts.push({ kind: 'tool-result', isError: codexOutputIsError(payload.output), ts });
+          break;
+        case 'tool_search_call':
+          facts.push({
+            kind: 'tool-start',
+            tool: 'ToolSearch',
+            detail: str(payload.query),
+            messageId: str(payload.call_id) ?? `codex-${ts}`,
+            ts,
+          });
+          break;
+        case 'tool_search_output':
+          facts.push({ kind: 'tool-result', isError: false, ts });
+          break;
       }
       break;
     }
@@ -201,7 +289,7 @@ export function interpretCodexLine(line: string): Fact[] {
       if (!payload) break;
       if (payload.type === 'token_count') {
         const u = extractCodexUsage(payload);
-        if (u) facts.push({ kind: 'usage-total', input: u.input, output: u.output });
+        if (u) facts.push({ kind: 'usage-total', ...u });
       } else if (payload.type === 'task_complete' || payload.type === 'turn_complete') {
         facts.push({ kind: 'turn-end', ts });
       }
