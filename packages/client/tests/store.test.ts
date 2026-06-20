@@ -6,17 +6,17 @@ beforeEach(() => {
   useWorld.setState({ autofollow: false, selectedSessionId: undefined, selectedBuildingId: undefined, heroes: {} });
 });
 
-describe('autofollow w store', () => {
-  it('domyślnie wyłączony', () => {
+describe('autofollow in store', () => {
+  it('disabled by default', () => {
     expect(useWorld.getState().autofollow).toBe(false);
   });
 
-  it('setAutofollow(true) włącza', () => {
+  it('setAutofollow(true) enables it', () => {
     useWorld.getState().setAutofollow(true);
     expect(useWorld.getState().autofollow).toBe(true);
   });
 
-  it('zmiana zaznaczenia na INNĄ jednostkę resetuje autofollow', () => {
+  it('selection change to a DIFFERENT unit resets autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().select('hero-2');
@@ -24,14 +24,14 @@ describe('autofollow w store', () => {
     expect(useWorld.getState().selectedSessionId).toBe('hero-2');
   });
 
-  it('ponowny klik w TĘ SAMĄ śledzoną jednostkę NIE zrywa autofollow', () => {
+  it('clicking the SAME followed unit again does NOT break autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().select('hero-1');
     expect(useWorld.getState().autofollow).toBe(true);
   });
 
-  it('zamknięcie panelu (select(undefined)) resetuje autofollow', () => {
+  it('closing the panel (select(undefined)) resets autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().select(undefined);
@@ -45,7 +45,7 @@ describe('autofollow w store', () => {
     expect(useWorld.getState().autofollow).toBe(false);
   });
 
-  it('usunięcie ŚLEDZONEGO bohatera czyści selekcję i autofollow', () => {
+  it('removing the FOLLOWED hero clears selection and autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().apply({ type: 'hero-removed', sessionId: 'hero-1' });
@@ -53,7 +53,7 @@ describe('autofollow w store', () => {
     expect(useWorld.getState().autofollow).toBe(false);
   });
 
-  it('usunięcie INNEGO bohatera nie zmienia selekcji/autofollow', () => {
+  it('removing a DIFFERENT hero does not change selection/autofollow', () => {
     useWorld.getState().select('hero-1');
     useWorld.getState().setAutofollow(true);
     useWorld.getState().apply({ type: 'hero-removed', sessionId: 'hero-2' });
@@ -67,7 +67,7 @@ function arsenal(over: Partial<ProjectArsenal>): ProjectArsenal {
 }
 
 describe('store arsenal-updated', () => {
-  it('zapisuje arsenał per projectDir', () => {
+  it('stores arsenal per projectDir', () => {
     useWorld.getState().apply({ type: 'arsenal-updated', arsenal: arsenal({ projectDir: 'PD' }) });
     expect(useWorld.getState().arsenal['PD']?.projectName).toBe('p');
   });
