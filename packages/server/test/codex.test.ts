@@ -178,6 +178,35 @@ describe('interpretCodexLine', () => {
     });
   });
 
+  it('Codex token_count ignores malformed token values without emitting NaN', () => {
+    expect(interpretCodexLine(line({
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: {
+            input_tokens: 'not-a-number',
+            cached_input_tokens: 'also-bad',
+            output_tokens: '12',
+            reasoning_output_tokens: '42',
+          },
+          last_token_usage: {
+            input_tokens: 'bad',
+            cached_input_tokens: 'bad-cache',
+            output_tokens: 7,
+            reasoning_output_tokens: '3',
+          },
+        },
+      },
+    }))).toContainEqual({
+      kind: 'usage-total',
+      input: 0,
+      output: 12,
+      reasoningOutput: 42,
+      last: { input: 0, output: 7, reasoningOutput: 3 },
+    });
+  });
+
   it('real user prompt -> prompt fact; injections -> nothing', () => {
     const userMsg = (text: string) =>
       interpretCodexLine(line({ type: 'response_item', timestamp: '2026-06-14T10:00:00.000Z', payload: { type: 'message', role: 'user', content: [{ type: 'input_text', text }] } }));
@@ -232,6 +261,18 @@ describe('helpers (tuning points)', () => {
     expect(codexToolToCanonical('read_file')).toBe('Read');
     expect(codexToolToCanonical('web_search')).toBe('WebSearch');
     expect(codexToolToCanonical('pencil__draw')).toBe('mcp__pencil__draw');
+  });
+  it('codexToolToCanonical: maps dotted Codex-local tools before MCP fallback', () => {
+    expect(codexToolToCanonical('functions.write_stdin')).toBe('Bash');
+    expect(codexToolToCanonical('functions.request_user_input')).toBe('AskUserQuestion');
+    expect(codexToolToCanonical('functions.view_image')).toBe('Read');
+    expect(codexToolToCanonical('functions.update_goal')).toBe('Workflow');
+    expect(codexToolToCanonical('functions.create_goal')).toBe('Workflow');
+    expect(codexToolToCanonical('functions.get_goal')).toBe('Workflow');
+    expect(codexToolToCanonical('functions.exec_command')).toBe('Bash');
+    expect(codexToolToCanonical('tool_search.tool_search_tool')).toBe('ToolSearch');
+    expect(codexToolToCanonical('image_gen.imagegen')).toBe('Edit');
+    expect(codexToolToCanonical('mcp__server__tool')).toBe('mcp__server__tool');
   });
 });
 

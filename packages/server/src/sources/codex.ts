@@ -46,9 +46,11 @@ export function codexToolToCanonical(name: string): string {
     case 'exec':
     case 'exec_command':
     case 'functions.exec_command':
+    case 'functions.write_stdin':
       return 'Bash'; // kopalnia (git w argumentach → targ, jak u Claude)
     case 'apply_patch':
     case 'functions.apply_patch':
+    case 'image_gen.imagegen':
       return 'Edit'; // forge
     case 'read_file':
     case 'view_image':
@@ -61,9 +63,15 @@ export function codexToolToCanonical(name: string): string {
       return 'WebSearch'; // tower
     case 'tool_search_call':
     case 'tool_search_tool':
+    case 'tool_search.tool_search_tool':
       return 'ToolSearch';
+    case 'functions.request_user_input':
+      return 'AskUserQuestion';
     case 'update_plan':
     case 'functions.update_plan':
+    case 'functions.update_goal':
+    case 'functions.create_goal':
+    case 'functions.get_goal':
     case 'multi_tool_use.parallel':
       return 'Workflow';
     case 'js':
@@ -131,6 +139,21 @@ function codexOutputIsError(output: unknown): boolean {
 }
 
 /** Extracts cumulative token usage from token_count payload (several shapes). */
+function finiteToken(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+function requiredToken(value: unknown): number {
+  return finiteToken(value) ?? 0;
+}
+
+function optionalToken(value: unknown): number | undefined {
+  const n = finiteToken(value);
+  return n && n > 0 ? n : undefined;
+}
+
 function extractCodexUsage(payload: any):
   | {
       input: number;
@@ -145,26 +168,33 @@ function extractCodexUsage(payload: any):
   const total = info?.total_token_usage ?? payload?.total_token_usage ?? payload;
   if (!total || typeof total !== 'object') return undefined;
 
-  const input = Number(total.input_tokens ?? total.input ?? 0);
-  const output = Number(total.output_tokens ?? total.output ?? 0);
+  const input = requiredToken(total.input_tokens ?? total.input);
+  const output = requiredToken(total.output_tokens ?? total.output);
   if (!input && !output) return undefined;
 
   const lastRaw = info?.last_token_usage;
-  const last = lastRaw && typeof lastRaw === 'object'
+  const lastInput = lastRaw && typeof lastRaw === 'object' ? requiredToken(lastRaw.input_tokens ?? lastRaw.input) : 0;
+  const lastOutput = lastRaw && typeof lastRaw === 'object' ? requiredToken(lastRaw.output_tokens ?? lastRaw.output) : 0;
+  const lastCachedInput = lastRaw && typeof lastRaw === 'object' ? optionalToken(lastRaw.cached_input_tokens) : undefined;
+  const lastReasoningOutput = lastRaw && typeof lastRaw === 'object' ? optionalToken(lastRaw.reasoning_output_tokens) : undefined;
+  const last = lastRaw && typeof lastRaw === 'object' && (lastInput || lastOutput)
     ? {
-        input: Number(lastRaw.input_tokens ?? lastRaw.input ?? 0),
-        output: Number(lastRaw.output_tokens ?? lastRaw.output ?? 0),
-        ...(lastRaw.cached_input_tokens !== undefined ? { cachedInput: Number(lastRaw.cached_input_tokens) } : {}),
-        ...(lastRaw.reasoning_output_tokens !== undefined ? { reasoningOutput: Number(lastRaw.reasoning_output_tokens) } : {}),
+        input: lastInput,
+        output: lastOutput,
+        ...(lastCachedInput !== undefined ? { cachedInput: lastCachedInput } : {}),
+        ...(lastReasoningOutput !== undefined ? { reasoningOutput: lastReasoningOutput } : {}),
       }
     : undefined;
+  const context = optionalToken(info?.model_context_window);
+  const cachedInput = optionalToken(total.cached_input_tokens);
+  const reasoningOutput = optionalToken(total.reasoning_output_tokens);
 
   return {
     input,
     output,
-    ...(typeof info?.model_context_window === 'number' ? { context: info.model_context_window } : {}),
-    ...(total.cached_input_tokens !== undefined ? { cachedInput: Number(total.cached_input_tokens) } : {}),
-    ...(total.reasoning_output_tokens !== undefined ? { reasoningOutput: Number(total.reasoning_output_tokens) } : {}),
+    ...(context !== undefined ? { context } : {}),
+    ...(cachedInput !== undefined ? { cachedInput } : {}),
+    ...(reasoningOutput !== undefined ? { reasoningOutput } : {}),
     ...(last ? { last } : {}),
   };
 }
