@@ -66,7 +66,7 @@ async function readPlugins(pluginsRoot: string): Promise<ArsenalSkill[]> {
   return out;
 }
 
-/** Efektywny zestaw skilli: projekt ∪ user ∪ plugin, dedup po id (projekt > user > plugin). */
+/** Effective skill set: project + user + plugin, deduped by id (project > user > plugin). */
 export async function readSkills({ workingDir, homeDir }: Opts): Promise<ArsenalSkill[]> {
   const [project, user, plugin] = await Promise.all([
     readOneLevel(path.join(workingDir, '.claude', 'skills'), 'project'),

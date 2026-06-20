@@ -8,14 +8,14 @@ function clip(text: string, max = 240): string {
 
 /**
  * Whether text is a HUMAN PROMPT, not a synthetic Claude Code turn.
- * Transkrypt miesza prawdziwe prompty z: przerwaniami, blokami
- * <system-reminder>/<command-*>/<local-command-*>, "Caveat:...", skill
+ * The transcript mixes real prompts with interruptions, blocks such as
+ * <system-reminder>/<command-*>/<local-command-*>, "Caveat:...", and skill
  * injections ("Base directory for this skill:..."). Without this filter they
  * pollute missions and hero names.
  *
  * USER CONTRIBUTION (learning): this is a heuristic; tune the rejection list for your sessions.
- * Jest celowo KONSERWATYWNA: odrzuca tylko jawne markery systemowe, a markdown
- * ("# Zadanie:...") and short messages ("tak deploy") as real prompts.
+ * It is intentionally CONSERVATIVE: rejects only explicit system markers, and
+ * treats markdown ("# Task:...") and short messages ("yes deploy") as real prompts.
  */
 export function isHumanPrompt(text: string): boolean {
   const t = text.trim();

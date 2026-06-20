@@ -204,7 +204,7 @@ export function interpretKodaLine(line: string): Fact[] {
   
   switch (record.type) {
     case 'session': {
-      // Pierwsza linia - metadane sesji
+      // First line - session metadata.
       const cwd = str(record.cwd);
       const id = str(record.id);
       facts.push({
@@ -272,8 +272,8 @@ export const kodaSource: AgentSource = {
   classify(path: string, root: string): ClassifiedFile {
     const rel = path.slice(root.length + 1);
     const parts = rel.split(sep);
-    // parts[0] = zakodowany katalog roboczy
-    // parts[1] = plik sesji <ts>_<uuid>.jsonl
+    // parts[0] = encoded working directory
+    // parts[1] = session file <ts>_<uuid>.jsonl
     if (parts.length !== 2) return { kind: 'other' };
     const file = parts[1];
     if (!file.endsWith('.jsonl')) return { kind: 'other' };

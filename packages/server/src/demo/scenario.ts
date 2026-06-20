@@ -5,7 +5,7 @@ import type { World } from '../world.js';
  * Demo mode: looped story of three scenes (user choice, 2026-06-13):
  *  1. Peon treasure run: subagent works and returns with a crate.
  *  2. Failure and repair: tool error, smoke, fix, fireworks.
- *  3. Karawana git: po pracy bohater zanosi kod na targ (commit + push).
+ *  3. Git caravan: after work, the hero carries code to the market (commit + push).
  * Client does not distinguish demo from real sessions: same events.
  */
 
@@ -68,7 +68,7 @@ const H2 = 'demo-scout';
 const PEON = 'demo-peon-1';
 
 const TIMELINE: Step[] = [
-  // --- Scena: awaria i naprawa + karawana git (bohater 1) ---
+  // --- Scene: failure and repair + git caravan (hero 1) ---
   {
     at: 1,
     run: (w, i) => {
@@ -106,7 +106,7 @@ const TIMELINE: Step[] = [
   },
   { at: 50, run: (w) => patch(w, H1, { state: 'idle' }) },
 
-  // --- Scena: wyprawa peona po skarb (bohater 2) ---
+  // --- Scene: peon treasure run (hero 2) ---
   {
     at: 6,
     run: (w, i) => {

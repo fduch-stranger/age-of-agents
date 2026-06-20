@@ -192,7 +192,7 @@ export function interpretOpencodeMessage(data: Record<string, unknown>, ts: stri
   return facts;
 }
 
-/** Ekstrahuje metadane z sesji OpenCode. */
+/** Extracts metadata from an OpenCode session. */
 export function extractOpencodeMeta(sessionRow: Record<string, unknown>): { model?: string; cwd?: string; gitBranch?: string } {
   const modelData = sessionRow.model as string | undefined;
   let model: string | undefined;

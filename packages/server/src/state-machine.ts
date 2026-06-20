@@ -13,7 +13,7 @@ export interface StateThresholds {
   idleAfterMs: number;
   /** After how many ms 'idle' changes to 'sleeping' (desaturation, zzz). */
   sleepAfterMs: number;
-  /** Po ilu ms snu bohater znika z mapy. */
+  /** After how many ms asleep the hero disappears from the map. */
   removeAfterMs: number;
   /** How long the hero shows 'error' before returning to work/idle. */
   errorFlashMs: number;

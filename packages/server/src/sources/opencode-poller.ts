@@ -174,8 +174,8 @@ export class OpenCodePoller {
       });
       
       // Send aggregated tokens from session table (OpenCode stores them on session).
-      // 'usage-total' sets (does not add), so once at the first
-      // widzeniu sesji - tracker zainicjalizuje statystyki.
+      // 'usage-total' sets (does not add), so once at first session sighting
+      // is enough for the tracker to initialize stats.
       this.applySessionTokens(state, sessionRow);
     } else {
       // Known session: update tokens (session may have received new data meanwhile).
@@ -267,7 +267,7 @@ export class OpenCodePoller {
     if (this.processedStale.has(sessionId)) return;
     this.processedStale.add(sessionId);
     // Tokens processed only once: applySessionTokens is in SessionState.
-    // z RESERVED, ale tu nie mamy trackera (bo nie chcemy bohatera).
+    // from RESERVED, but there is no tracker here because we do not want a hero.
     // Building stats are computed by another mechanism (JSONL files).
   }
 }

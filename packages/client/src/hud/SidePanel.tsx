@@ -242,7 +242,7 @@ function Label({ text }: { text: string }) {
   );
 }
 
-/** Czas trwania od startu sesji, np. "12 min" / "1h 5m". */
+/** Duration since session start, for example "12 min" / "1h 5m". */
 function fmtDuration(startedAt: string, now: number): string {
   const m = (now - Date.parse(startedAt)) / 60_000;
   if (!isFinite(m) || m < 1) return '<1 min';
