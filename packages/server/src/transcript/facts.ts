@@ -17,6 +17,7 @@ export type Fact =
       input: number;
       output: number;
       context?: number;
+      contextWindow?: number;
       cachedInput?: number;
       reasoningOutput?: number;
       last?: { input: number; output: number; cachedInput?: number; reasoningOutput?: number };

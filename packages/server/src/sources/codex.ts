@@ -159,6 +159,7 @@ function extractCodexUsage(payload: any):
       input: number;
       output: number;
       context?: number;
+      contextWindow?: number;
       cachedInput?: number;
       reasoningOutput?: number;
       last?: { input: number; output: number; cachedInput?: number; reasoningOutput?: number };
@@ -185,7 +186,8 @@ function extractCodexUsage(payload: any):
         ...(lastReasoningOutput !== undefined ? { reasoningOutput: lastReasoningOutput } : {}),
       }
     : undefined;
-  const context = optionalToken(info?.model_context_window);
+  const context = last && last.input > 0 ? last.input : undefined;
+  const contextWindow = optionalToken(info?.model_context_window);
   const cachedInput = optionalToken(total.cached_input_tokens);
   const reasoningOutput = optionalToken(total.reasoning_output_tokens);
 
@@ -193,6 +195,7 @@ function extractCodexUsage(payload: any):
     input,
     output,
     ...(context !== undefined ? { context } : {}),
+    ...(contextWindow !== undefined ? { contextWindow } : {}),
     ...(cachedInput !== undefined ? { cachedInput } : {}),
     ...(reasoningOutput !== undefined ? { reasoningOutput } : {}),
     ...(last ? { last } : {}),
@@ -325,6 +328,7 @@ export function interpretCodexLine(line: string): Fact[] {
       }
       break;
     }
+
   }
 
   return facts;

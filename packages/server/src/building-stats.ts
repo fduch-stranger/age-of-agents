@@ -2,6 +2,7 @@ import { readFile, readdir, stat } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
+  completedBuildingForTheme,
   resolveBuilding,
   DEFAULT_MAPPING,
   type BuildingId,
@@ -174,6 +175,16 @@ function codexOutputTotalFromRecord(rec: any): { ts: number; outputTotal: number
   return Number.isFinite(outputTotal) ? { ts, outputTotal } : undefined;
 }
 
+function codexTurnEndFromRecord(rec: any): boolean {
+  if (rec?.type !== 'event_msg') return false;
+  const payload = rec.payload;
+  return payload?.type === 'task_complete' || payload?.type === 'turn_complete';
+}
+
+function completedBuildingsForAllThemes(): BuildingId[] {
+  return [...new Set([completedBuildingForTheme('fantasy'), completedBuildingForTheme('scifi')])];
+}
+
 async function scanFile(
   path: string,
   acc: Map<BuildingId, Bucket>,
@@ -182,7 +193,7 @@ async function scanFile(
   config: MappingConfig,
 ): Promise<void> {
   const content = await readFile(path, 'utf8');
-  let current: BuildingId = 'citadel'; // current session work building (last tool)
+  let current: BuildingId[] = ['citadel']; // current session work building(s)
   let codexOutputTotal = 0;
   for (const line of content.split('\n')) {
     if (!line) continue;
@@ -192,9 +203,14 @@ async function scanFile(
     } catch {
       continue;
     }
+    if (codexTurnEndFromRecord(rec)) {
+      current = completedBuildingsForAllThemes();
+      continue;
+    }
+
     const codexTool = codexToolFromRecord(rec);
     if (codexTool) {
-      current = resolveBuilding(codexTool.name, codexTool.detail, config);
+      current = [resolveBuilding(codexTool.name, codexTool.detail, config)];
       continue;
     }
 
@@ -203,7 +219,9 @@ async function scanFile(
       const delta = codexUsage.outputTotal - codexOutputTotal;
       codexOutputTotal = codexUsage.outputTotal;
       if (delta > 0) {
-        accumulateMessage(acc, { ts: codexUsage.ts, output: delta, tools: [] }, now, dayStart, current, config);
+        for (const building of current) {
+          accumulateMessage(acc, { ts: codexUsage.ts, output: delta, tools: [] }, now, dayStart, building, config);
+        }
       }
       continue;
     }
@@ -212,9 +230,9 @@ async function scanFile(
     if (!sample) continue;
     if (sample.tools.length) {
       const last = sample.tools[sample.tools.length - 1];
-      current = resolveBuilding(last.name, last.detail, config);
+      current = [resolveBuilding(last.name, last.detail, config)];
     }
-    accumulateMessage(acc, sample, now, dayStart, current, config);
+    accumulateMessage(acc, sample, now, dayStart, current[0] ?? 'citadel', config);
   }
 }
 

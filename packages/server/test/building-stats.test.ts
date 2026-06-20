@@ -137,6 +137,82 @@ describe('computeBuildingStats - Codex rollout records', () => {
     expect(res.buildings.mine?.today).toBe(40);
     expect(res.buildings.forge?.today).toBe(50);
   });
+
+  it('does not create Codex output deltas from compacted token_count repeats', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      { type: 'compacted', timestamp: new Date(NOW + 1000).toISOString(), payload: { window_id: 1 } },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+    ]);
+
+    const res = await computeBuildingStats(root, NOW + 2000);
+    expect(res.buildings.mine?.today).toBe(40);
+  });
+
+  it('credits Codex task completion to theme resting buildings', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: { type: 'task_complete' },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1200, output_tokens: 90 } },
+        },
+      },
+    ]);
+
+    const res = await computeBuildingStats(root, NOW + 2000);
+    expect(res.buildings.mine?.today).toBe(40);
+    expect(res.buildings.garden?.today).toBe(50);
+    expect(res.buildings.hydroponics?.today).toBe(50);
+  });
 });
 
 describe('getBuildingStats - cache + invalidation during scan', () => {

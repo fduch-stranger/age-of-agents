@@ -6,6 +6,7 @@ import { useSettings } from '../settings';
 import { useUi, buildingText } from '../i18n';
 import { clip, formatK, relTime } from '../util';
 import { teamColorHex } from '../game/placeholders';
+import { activityBuildingForAction, activityBuildingForHero } from '../game/home-building';
 import { StatTile } from './StatTile';
 
 const EMPTY: BuildingWindowStats = { today: 0, week: 0, month: 0 };
@@ -51,7 +52,7 @@ export function BuildingPanel() {
 
   // "Working now": live from world state (heroes + peons at this building).
   const workerHeroes = Object.values(heroes).filter(
-    (h) => h.state === 'working' && resolveBuilding(h.currentTool, h.toolDetail, mapping) === buildingId,
+    (h) => activityBuildingForHero(themeId, h, mapping) === buildingId,
   );
   const workerPeons = Object.values(peons).filter(
     (p) => p.state === 'working' && resolveBuilding(p.currentTool, undefined, mapping) === buildingId,
@@ -63,7 +64,7 @@ export function BuildingPanel() {
   const now = Date.now();
   const activity = Object.values(heroes)
     .flatMap((h) => (h.recentActions ?? []).map((a) => ({ a, hero: h })))
-    .filter(({ a }) => resolveBuilding(a.tool, a.detail, mapping) === buildingId)
+    .filter(({ a }) => activityBuildingForAction({ kind: 'tool', tool: a.tool, detail: a.detail }, themeId, mapping) === buildingId)
     .sort((x, y) => y.a.ts.localeCompare(x.a.ts))
     .slice(0, 8);
 
@@ -87,7 +88,7 @@ export function BuildingPanel() {
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
           {workerHeroes.map((h) => (
             <div key={h.sessionId} className="line assistant" style={{ alignSelf: 'stretch', maxWidth: '100%' }}>
-              🦸 {clip(h.title, 40)} · {h.toolDetail ? clip(h.toolDetail, 30) : h.currentTool}
+              🦸 {clip(h.title, 40)} · {h.toolDetail ? clip(h.toolDetail, 30) : h.currentTool ?? h.state}
             </div>
           ))}
           {workerPeons.map((p) => (

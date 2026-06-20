@@ -55,17 +55,17 @@ describe('SessionTracker', () => {
     expect(world.getHero('session-1')?.tokens).toEqual({ input: 250, output: 90 });
   });
 
-  it('usage-total updates cumulative tokens and latest Codex context window', () => {
+  it('usage-total updates cumulative tokens and latest Codex context usage', () => {
     const world = new World();
     const tracker = new SessionTracker(world, 'sCodexUsage', 'PD');
 
-    tracker.apply({ kind: 'usage-total', input: 37049245, output: 178333, context: 258400 });
+    tracker.apply({ kind: 'usage-total', input: 37049245, output: 178333, context: 180825, contextWindow: 258400 });
     expect(world.getHero('sCodexUsage')?.tokens).toEqual({ input: 37049245, output: 178333 });
-    expect(world.getHero('sCodexUsage')?.contextTokens).toBe(258400);
+    expect(world.getHero('sCodexUsage')?.contextTokens).toBe(180825);
 
-    tracker.apply({ kind: 'usage-total', input: 37200000, output: 178900, context: 258400 });
+    tracker.apply({ kind: 'usage-total', input: 37200000, output: 178900, context: 20116, contextWindow: 258400 });
     expect(world.getHero('sCodexUsage')?.tokens).toEqual({ input: 37200000, output: 178900 });
-    expect(world.getHero('sCodexUsage')?.contextTokens).toBe(258400);
+    expect(world.getHero('sCodexUsage')?.contextTokens).toBe(20116);
   });
 
   it('agent from constructor lands in HeroSnapshot', () => {

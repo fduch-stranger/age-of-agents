@@ -251,6 +251,69 @@ export function resolveBuilding(
   return config.fallback;
 }
 
+const HOME_BUILDINGS_BY_THEME: Record<string, BuildingId[]> = {
+  fantasy: ['arena', 'tavern', 'garden', 'bar', 'shrine'],
+  scifi: ['holodeck', 'mess', 'hydroponics', 'lounge', 'medbay'],
+};
+
+const AWAITING_BUILDING_BY_THEME: Record<string, BuildingId> = {
+  fantasy: 'shrine',
+  scifi: 'lounge',
+};
+
+const COMPLETED_BUILDING_BY_THEME: Record<string, BuildingId> = {
+  fantasy: 'garden',
+  scifi: 'hydroponics',
+};
+
+function projectHash(s: string): number {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+export function homeBuildingForTheme(
+  themeId: string,
+  hero: Pick<HeroSnapshot, 'projectName' | 'projectDir'>,
+): BuildingId {
+  const options = HOME_BUILDINGS_BY_THEME[themeId];
+  if (!options || options.length === 0) return 'citadel';
+  const key = hero.projectName ?? hero.projectDir ?? '';
+  if (!key) return 'citadel';
+  return options[projectHash(key) % options.length];
+}
+
+export function awaitingBuildingForTheme(themeId: string): BuildingId {
+  return AWAITING_BUILDING_BY_THEME[themeId] ?? 'citadel';
+}
+
+export function completedBuildingForTheme(themeId: string): BuildingId {
+  return COMPLETED_BUILDING_BY_THEME[themeId] ?? 'citadel';
+}
+
+export function activityBuildingForHero(
+  themeId: string,
+  hero: Pick<HeroSnapshot, 'state' | 'currentTool' | 'toolDetail' | 'projectName' | 'projectDir'>,
+  config: MappingConfig,
+): BuildingId | undefined {
+  if (hero.state === 'working') return resolveBuilding(hero.currentTool, hero.toolDetail, config);
+  if (hero.state === 'awaiting-input') return awaitingBuildingForTheme(themeId);
+  return undefined;
+}
+
+export type ActivityAction =
+  | { kind: 'tool'; tool: string; detail?: string }
+  | { kind: 'completed'; projectName?: string; projectDir?: string };
+
+export function activityBuildingForAction(
+  action: ActivityAction,
+  themeId: string,
+  config: MappingConfig,
+): BuildingId {
+  if (action.kind === 'tool') return resolveBuilding(action.tool, action.detail, config);
+  return completedBuildingForTheme(themeId);
+}
+
 /** Thin DEFAULT_MAPPING wrapper for backwards compatibility with existing imports. */
 export function toolToBuilding(tool: string | undefined, detail?: string): BuildingId {
   return resolveBuilding(tool, detail, DEFAULT_MAPPING);

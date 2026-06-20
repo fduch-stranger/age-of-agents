@@ -144,7 +144,7 @@ describe('interpretCodexLine', () => {
     });
   });
 
-  it('Codex token_count preserves cumulative totals and current context window', () => {
+  it('Codex token_count preserves cumulative totals and current context usage', () => {
     expect(interpretCodexLine(line({
       type: 'event_msg',
       payload: {
@@ -171,11 +171,20 @@ describe('interpretCodexLine', () => {
       kind: 'usage-total',
       input: 37049245,
       output: 178333,
-      context: 258400,
+      context: 180825,
+      contextWindow: 258400,
       cachedInput: 35437952,
       reasoningOutput: 24685,
       last: { input: 180825, output: 227, cachedInput: 179072, reasoningOutput: 98 },
     });
+  });
+
+  it('Codex compacted records do not end the current task', () => {
+    expect(interpretCodexLine(line({
+      type: 'compacted',
+      timestamp: '2026-06-20T10:57:08.706Z',
+      payload: { window_id: 1, window_number: 2 },
+    }))).toEqual([]);
   });
 
   it('Codex token_count ignores malformed token values without emitting NaN', () => {

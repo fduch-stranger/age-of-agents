@@ -182,7 +182,7 @@ const EN: UiStrings = {
   context: 'Context',
   settings: 'Settings',
   buildingReactions: 'Building reactions',
-  buildingReactionsHint: 'Pick which live-log tools each building reacts to. Edit visually or as JSON below — both stay in sync.',
+  buildingReactionsHint: 'Pick which live-log tools each working building reacts to. Social buildings use session state such as idle, awaiting input, or completed work.',
   addTrigger: 'add (, or ;)',
   kindName: 'name',
   kindPattern: 'pattern',
