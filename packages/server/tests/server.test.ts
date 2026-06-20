@@ -12,7 +12,7 @@ afterEach(async () => {
 });
 
 describe('startServer', () => {
-  it('serwuje /health w trybie demo i zwraca realny port', async () => {
+  it('serves /health in demo mode and returns a real port', async () => {
     running = await startServer({ port: 0, demo: true });
     expect(running.port).toBeGreaterThan(0);
     const res = await fetch(`http://localhost:${running.port}/health`);
@@ -20,7 +20,7 @@ describe('startServer', () => {
     expect(await res.json()).toEqual({ ok: true, demo: true });
   });
 
-  it('serwuje index.html klienta z webRoot', async () => {
+  it('serves client index.html from webRoot', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'aoa-web-'));
     writeFileSync(join(dir, 'index.html'), '<!doctype html><title>AIOA-TEST</title>');
     running = await startServer({ port: 0, demo: true, webRoot: dir });
@@ -29,13 +29,13 @@ describe('startServer', () => {
     expect(root.status).toBe(200);
     expect(await root.text()).toContain('AIOA-TEST');
 
-    // SPA fallback: nieznana trasa też zwraca index.html.
+    // SPA fallback: unknown routes also return index.html.
     const spa = await fetch(`http://localhost:${running.port}/jakas/trasa`);
     expect(spa.status).toBe(200);
     expect(await spa.text()).toContain('AIOA-TEST');
   });
 
-  it('GET /tool-mapping zwraca poprawny config', async () => {
+  it('GET /tool-mapping returns valid config', async () => {
     running = await startServer({ port: 0, demo: true });
     const res = await fetch(`http://localhost:${running.port}/tool-mapping`);
     expect(res.status).toBe(200);
@@ -45,7 +45,7 @@ describe('startServer', () => {
     expect(cfg.rules.length).toBeGreaterThan(0);
   });
 
-  it('PUT /tool-mapping odrzuca niepoprawny config (400)', async () => {
+  it('PUT /tool-mapping rejects invalid config (400)', async () => {
     running = await startServer({ port: 0, demo: true });
     const res = await fetch(`http://localhost:${running.port}/tool-mapping`, {
       method: 'PUT',
@@ -56,7 +56,7 @@ describe('startServer', () => {
     expect((await res.json()).error).toBeTruthy();
   });
 
-  it('PUT /tool-mapping akceptuje poprawny config (200, echo)', async () => {
+  it('PUT /tool-mapping accepts valid config (200, echo)', async () => {
     running = await startServer({ port: 0, demo: true });
     const cfg = { rules: [{ kind: 'exact', tool: 'Edit', building: 'library' }], fallback: 'citadel' };
     const res = await fetch(`http://localhost:${running.port}/tool-mapping`, {

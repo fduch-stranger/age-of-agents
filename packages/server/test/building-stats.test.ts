@@ -14,53 +14,53 @@ function acc() {
 }
 
 describe('accumulateMessage', () => {
-  it('przypisuje tokeny do budynku narzędzia we wszystkich oknach (dziś)', () => {
+  it('assigns tokens to the tool building in all windows (today)', () => {
     const a = acc();
     accumulateMessage(a, { ts: NOW, output: 100, tools: [{ name: 'Edit' }] }, NOW, DAY_START);
     expect(a.get('forge')).toEqual({ today: 100, week: 100, month: 100 });
   });
 
-  it('dzieli równo gdy wiadomość dotknęła kilku budynków', () => {
+  it('splits evenly when a message touched multiple buildings', () => {
     const a = acc();
     accumulateMessage(a, { ts: NOW, output: 100, tools: [{ name: 'Edit' }, { name: 'Read' }] }, NOW, DAY_START);
     expect(a.get('forge')?.month).toBe(50);
     expect(a.get('library')?.month).toBe(50);
   });
 
-  it('Bash z git → targ (atrybucja przez detail)', () => {
+  it('Bash with git -> market (attribution by detail)', () => {
     const a = acc();
     accumulateMessage(a, { ts: NOW, output: 80, tools: [{ name: 'Bash', detail: 'git push origin main' }] }, NOW, DAY_START);
     expect(a.get('market')?.today).toBe(80);
     expect(a.has('mine')).toBe(false);
   });
 
-  it('wiadomość bez narzędzia → twierdza (domyślny fallback)', () => {
+  it('message without a tool -> citadel (default fallback)', () => {
     const a = acc();
     accumulateMessage(a, { ts: NOW, output: 30, tools: [] }, NOW, DAY_START);
     expect(a.get('citadel')?.month).toBe(30);
   });
 
-  it('rozumowanie (bez narzędzia) idzie do budynku bieżącej pracy gdy podano fallback', () => {
+  it('reasoning (without a tool) goes to the current work building when fallback is provided', () => {
     const a = acc();
     accumulateMessage(a, { ts: NOW, output: 40, tools: [] }, NOW, DAY_START, 'forge');
     expect(a.get('forge')?.today).toBe(40);
     expect(a.has('citadel')).toBe(false);
   });
 
-  it('10 dni temu liczy się do 30 dni, ale nie do tygodnia ani dziś', () => {
+  it('10 days ago counts toward 30 days, but not week or today', () => {
     const a = acc();
     accumulateMessage(a, { ts: NOW - 10 * DAY, output: 100, tools: [{ name: 'Edit' }] }, NOW, DAY_START);
     expect(a.get('forge')).toEqual({ today: 0, week: 0, month: 100 });
   });
 
-  it('starsze niż 30 dni i zerowe tokeny są ignorowane', () => {
+  it('older than 30 days and zero-token messages are ignored', () => {
     const a = acc();
     accumulateMessage(a, { ts: NOW - 40 * DAY, output: 100, tools: [{ name: 'Edit' }] }, NOW, DAY_START);
     accumulateMessage(a, { ts: NOW, output: 0, tools: [{ name: 'Edit' }] }, NOW, DAY_START);
     expect(a.size).toBe(0);
   });
 
-  it('honoruje customowy config (Edit→library zamiast forge)', () => {
+  it('honors custom config (Edit->library instead of forge)', () => {
     const cfg: MappingConfig = {
       rules: [{ kind: 'exact', tool: 'Edit', building: 'library' }],
       fallback: 'citadel',
@@ -72,7 +72,7 @@ describe('accumulateMessage', () => {
   });
 });
 
-/** Korpus z jedną wiadomością assistant używającą `tool` (świeży timestamp → w oknie 30 dni). */
+/** Corpus with one assistant message using `tool` (fresh timestamp -> in the 30-day window). */
 function rootWithTool(tool: string): string {
   const dir = mkdtempSync(join(tmpdir(), 'aoa-stats-'));
   const rec = {
@@ -84,20 +84,20 @@ function rootWithTool(tool: string): string {
   return dir;
 }
 
-describe('getBuildingStats — cache + inwalidacja w trakcie skanu', () => {
-  it('invalidate podczas trwającego przelotu NIE utrwala nieświeżego wyniku', async () => {
+describe('getBuildingStats - cache + invalidation during scan', () => {
+  it('invalidate during an in-flight scan does NOT persist a stale result', async () => {
     invalidateBuildingStatsCache();
-    const rootEdit = rootWithTool('Edit'); // → forge
-    const rootRead = rootWithTool('Read'); // → library
+    const rootEdit = rootWithTool('Edit'); // -> forge
+    const rootRead = rootWithTool('Read'); // -> library
 
-    // computeBuildingStats robi `await readdir`, więc synchroniczny invalidate
-    // tuż po starcie wbija się PRZED rozwiązaniem przelotu (deterministyczny wyścig).
+    // computeBuildingStats does `await readdir`, so synchronous invalidate
+    // right after startup lands BEFORE the scan resolves (deterministic race).
     const inflight = getBuildingStats(rootEdit);
     invalidateBuildingStatsCache();
     await inflight;
 
-    // Gdyby przelot zapisał cache mimo inwalidacji, to wywołanie zwróciłoby stare
-    // `forge` (z rootEdit). Po poprawce cache jest pusty → liczy rootRead od nowa.
+    // If the scan saved cache despite invalidation, this call would return the stale
+    // `forge` (from rootEdit). After the fix, cache is empty -> rootRead is recalculated.
     const res = await getBuildingStats(rootRead);
     expect(res.buildings.library).toBeDefined();
     expect(res.buildings.forge).toBeUndefined();

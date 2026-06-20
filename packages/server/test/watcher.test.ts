@@ -26,26 +26,26 @@ async function waitFor(check: () => boolean): Promise<void> {
   expect(check()).toBe(true);
 }
 
-describe('isLiveAtStartup — okno wykrywania sesji przy starcie', () => {
+describe('isLiveAtStartup - session detection window at startup', () => {
   const now = Date.parse('2026-06-14T12:00:00.000Z');
-  // Okno startowe = removeAfterMs: tworzymy bohatera tylko dla sesji, która i tak
-  // by nie została od razu usunięta przez maszynę stanów (brak migotania).
+  // Startup window = removeAfterMs: create a hero only for a session that would not
+  // be immediately removed by the state machine anyway (no flicker).
   const W = DEFAULT_THRESHOLDS.removeAfterMs;
 
-  it('sesja cicha od 20 min jest żywa przy starcie (regresja: stare 10-min okno ją gubiło)', () => {
+  it('session quiet for 20 min is live at startup (regression: old 10-min window lost it)', () => {
     expect(isLiveAtStartup(now - 20 * 60_000, now, W)).toBe(true);
   });
 
-  it('sesja cicha od 40 min (poza removeAfterMs) nie jest żywa przy starcie', () => {
+  it('session quiet for 40 min (outside removeAfterMs) is not live at startup', () => {
     expect(isLiveAtStartup(now - 40 * 60_000, now, W)).toBe(false);
   });
 
-  it('świeżo zapisana sesja (1 min) jest żywa', () => {
+  it('freshly written session (1 min) is live', () => {
     expect(isLiveAtStartup(now - 60_000, now, W)).toBe(true);
   });
 });
 
-describe('SourceWatcher — subagenci z metadanych źródła', () => {
+describe('SourceWatcher - subagents from source metadata', () => {
   it('does not create a chokidar watcher when a source has no roots', async () => {
     chokidarWatchSpy.mockClear();
     const world = new World();
@@ -95,7 +95,7 @@ describe('SourceWatcher — subagenci z metadanych źródła', () => {
     }
   });
 
-  it('plik sklasyfikowany jako sesja może zostać przekierowany do peona po subagent-meta', async () => {
+  it('file classified as a session can be rerouted to a peon after subagent-meta', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'aoa-watcher-'));
     const world = new World();
     const source: AgentSource = {
@@ -184,8 +184,8 @@ describe('SourceWatcher — subagenci z metadanych źródła', () => {
   });
 });
 
-describe('SourceWatcher — odświeżanie korzeni', () => {
-  it('dodaje nowe korzenie podczas sweep bez usuwania starych', () => {
+describe('SourceWatcher - root refresh', () => {
+  it('adds new roots during sweep without removing old ones', () => {
     const dir1 = '/virtual/aoa-watcher-root-a';
     const dir2 = '/virtual/aoa-watcher-root-b';
     const world = new World();

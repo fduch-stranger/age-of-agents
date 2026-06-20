@@ -18,20 +18,20 @@ const CUSTOM: ModelConfig = {
 };
 
 describe('loadModelConfig', () => {
-  it('brak pliku → DEFAULT', async () => {
+  it('missing file -> DEFAULT', async () => {
     expect(await loadModelConfig(tmpPath())).toEqual(DEFAULT_MODEL_CONFIG);
   });
-  it('poprawny plik → wczytany config', async () => {
+  it('valid file -> loaded config', async () => {
     const p = tmpPath();
     writeFileSync(p, JSON.stringify(CUSTOM));
     expect(await loadModelConfig(p)).toEqual(CUSTOM);
   });
-  it('uszkodzony JSON → DEFAULT', async () => {
+  it('broken JSON -> DEFAULT', async () => {
     const p = tmpPath();
     writeFileSync(p, '{ nie json');
     expect(await loadModelConfig(p)).toEqual(DEFAULT_MODEL_CONFIG);
   });
-  it('niepoprawny config (zły sprite) → DEFAULT', async () => {
+  it('invalid config (bad sprite) -> DEFAULT', async () => {
     const p = tmpPath();
     writeFileSync(p, JSON.stringify({ sprites: [{ match: { kind: 'pattern', pattern: 'x' }, sprite: 'nope' }], windows: [], fallback: { sprite: 'sonnet', contextWindow: 1 } }));
     expect(await loadModelConfig(p)).toEqual(DEFAULT_MODEL_CONFIG);
@@ -39,7 +39,7 @@ describe('loadModelConfig', () => {
 });
 
 describe('saveModelConfig', () => {
-  it('tworzy katalog, zapisuje, load oddaje nowy config', async () => {
+  it('creates directory, saves, load returns new config', async () => {
     const p = join(mkdtempSync(join(tmpdir(), 'aoa-model-')), 'nested', 'model-config.json');
     const saved = await saveModelConfig(CUSTOM, p);
     expect(saved).toEqual(CUSTOM);
@@ -47,7 +47,7 @@ describe('saveModelConfig', () => {
     expect(JSON.parse(readFileSync(p, 'utf8'))).toEqual(CUSTOM);
     expect(await loadModelConfig(p)).toEqual(CUSTOM);
   });
-  it('odrzuca niepoprawny config', async () => {
+  it('rejects invalid config', async () => {
     await expect(saveModelConfig({ sprites: [], windows: [], fallback: { sprite: 'nope', contextWindow: 1 } } as unknown as ModelConfig, tmpPath())).rejects.toThrow();
   });
 });
