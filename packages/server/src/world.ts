@@ -19,7 +19,7 @@ export class World {
   private heroes = new Map<string, HeroSnapshot>();
   private peons = new Map<string, PeonSnapshot>();
   private missions = new Map<string, MissionSnapshot>();
-  private transcripts: TranscriptLine[] = [];
+  private transcripts = new Map<string, TranscriptLine[]>();
   private listeners = new Set<Listener>();
   private nextTeamColor = 0;
 
@@ -45,7 +45,7 @@ export class World {
       heroes: [...this.heroes.values()],
       peons: [...this.peons.values()],
       missions: [...this.missions.values()],
-      transcripts: this.transcripts,
+      transcripts: [...this.transcripts.values()].flatMap((lines) => lines),
     };
   }
 
@@ -111,7 +111,8 @@ export class World {
   }
 
   emitTranscriptLine(line: GameEvent & { type: 'transcript-line' }): void {
-    this.transcripts = [...this.transcripts, line.line].slice(-TRANSCRIPT_BUFFER);
+    const lines = this.transcripts.get(line.line.sessionId) ?? [];
+    this.transcripts.set(line.line.sessionId, [...lines, line.line].slice(-TRANSCRIPT_BUFFER));
     this.emit(line);
   }
 
