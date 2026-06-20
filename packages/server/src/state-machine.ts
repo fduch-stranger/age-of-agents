@@ -202,7 +202,11 @@ export class SessionTracker {
       case 'usage-total':
         // Codex: token_count is cumulative -> SET, do not add.
         this._tokens = { input: fact.input, output: fact.output };
-        this.patch({ tokens: this._tokens });
+        if (typeof fact.context === 'number') this.contextTokens = fact.context;
+        this.patch({
+          tokens: this._tokens,
+          ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}),
+        });
         break;
 
       case 'tool-result':
