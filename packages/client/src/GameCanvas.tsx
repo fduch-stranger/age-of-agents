@@ -14,10 +14,10 @@ export function GameCanvas() {
     if (!host) return;
     let view: GameView | undefined;
     let observer: ResizeObserver | undefined;
-    const uninstallGuards = installCameraGuards(host); // zoom tylko mapy, nie strony
+    const uninstallGuards = installCameraGuards(host); // zoom map only, not the page
 
-    // Inicjalizacja dopiero gdy host ma realny rozmiar — start przy
-    // szerokości 1 px (np. ukryta karta) psułby dopasowanie kamery.
+    // Initialize only when the host has a real size; starting at
+    // 1 px width (for example, hidden tab) would break camera fitting.
     const tryInit = () => {
       if (view || host.clientWidth < 50 || host.clientHeight < 50) return;
       view = new GameView(getTheme(themeId), lang);
@@ -33,7 +33,7 @@ export function GameCanvas() {
       uninstallGuards();
       view?.destroy();
     };
-    // Zmiana motywu LUB języka przebudowuje scenę (etykiety budynków z i18n).
+    // Changing theme OR language rebuilds the scene (building labels from i18n).
   }, [themeId, lang]);
 
   return <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />;
