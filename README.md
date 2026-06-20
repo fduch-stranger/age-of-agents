@@ -51,15 +51,15 @@ A glanceable, second-monitor view of what your agents are quietly up to.
 
 ## 🚀 Quick start
 
-Run it instantly, no install:
+**Quick run — `npx`.** No install, and it always fetches the latest release (handy since new versions ship often):
 
 ```bash
-npx age-of-agents          # watches ~/.claude, ~/.codex, ~/.opencode & ~/.koda sessions, prints the URL
+npx age-of-agents          # watches ~/.claude, ~/.codex, ~/.opencode & ~/.koda sessions (+ Claude in local Docker containers), prints the URL
 npx age-of-agents --demo   # calm demo mode (fake sessions)
 npx age-of-agents --open   # also open the browser
 ```
 
-Or install globally (commands `age-of-agents` and the shorter `aoa`):
+**Regular use — `npm i -g`.** Install it globally for a faster start and the short `aoa` command. You own the updates here, so run `npm update -g age-of-agents` now and then:
 
 ```bash
 npm i -g age-of-agents
@@ -98,6 +98,7 @@ agent session transcript ──▶ server (watcher + state machine) ──▶ We
 - The **server** tails JSONL transcripts, turns each line into a `Fact`, and runs a small per-session **state machine** (thinking / working / resting / idle / returning).
 - It broadcasts a `HeroSnapshot` for every session over a WebSocket. The snapshot carries *what* the session is doing (`currentTool`, recent actions, tokens) — never raw coordinates.
 - The **client** decides *where* each settler goes and renders the pixel-art realm, the HUD, the minimap and the side panel.
+- **Running agents in Docker?** Local containers are auto-discovered (zero-config) and their Claude sessions read straight out of the container via `docker exec` — no image changes, no host bind-mounts required. Containerized settlers carry a 🐳 badge in the side panel. Disable with `AGENTCRAFT_DOCKER=0`.
 
 ## 🏛️ Project intel (optional)
 

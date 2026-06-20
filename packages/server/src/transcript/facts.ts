@@ -11,7 +11,7 @@ export type Fact =
   | { kind: 'thinking'; ts: string }
   | { kind: 'assistant-text'; text: string; ts: string }
   | { kind: 'tool-start'; tool: string; detail?: string; messageId: string; ts: string }
-  | { kind: 'usage'; messageId: string; input: number; output: number; context?: number }
+  | { kind: 'usage'; messageId: string; input: number; output: number; context?: number; contextWindow?: number }
   | {
       kind: 'usage-total';
       input: number;
@@ -25,4 +25,5 @@ export type Fact =
   | { kind: 'turn-end'; ts: string }
   | { kind: 'tool-result'; isError: boolean; ts: string }
   | { kind: 'attribution'; skill?: string; plugin?: string; mcpServer?: string }
+  | { kind: 'cleared'; ts: string }
   | { kind: 'awaiting'; ts: string };

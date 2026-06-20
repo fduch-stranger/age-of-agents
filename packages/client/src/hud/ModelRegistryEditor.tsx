@@ -8,51 +8,89 @@ import {
   type ModelConfig,
   type ModelMatch,
   type SpriteId,
-  type SpriteRule,
   type WindowRule,
 } from '../theme/models';
 import { useModels } from '../model-store';
 import { useWorld } from '../store';
+import { useSettings } from '../settings';
 import { useUi, type UiStrings } from '../i18n';
 import { parseUploadedModelConfig, downloadModelConfig } from './model-io';
+import { ProviderEmblem } from './ProviderEmblem';
+import { seenModelsByAgent } from './seen-models';
+import {
+  groupBySprite,
+  addSpriteModel,
+  removeSpriteRule,
+  renameSprite,
+  setFallbackSprite,
+  type SpriteGroup,
+} from './model-sprite-edit';
 import { formatK } from '../util';
+
+// Klatka idle_00 (lewy-górny róg arkusza), jednolita 68×68 dla wszystkich spritów/motywów.
+const SPRITE_FRAME = 68;
+
+/** Miniatura spirita: kadr idle_00 z arkusza /assets/<theme>/heroes/<sprite>-default.png. */
+function SpriteThumb({ themeId, sprite, size = 56 }: { themeId: string; sprite: SpriteId; size?: number }) {
+  return (
+    <div
+      className="bre-thumb"
+      style={{ width: size, height: size, overflow: 'hidden', flex: 'none', display: 'block', padding: 0 }}
+      aria-hidden
+    >
+      <div
+        style={{
+          width: SPRITE_FRAME,
+          height: SPRITE_FRAME,
+          backgroundImage: `url(/assets/${themeId}/heroes/${sprite}-default.png)`,
+          backgroundPosition: '0 0',
+          backgroundRepeat: 'no-repeat',
+          imageRendering: 'pixelated',
+          transform: `scale(${size / SPRITE_FRAME})`,
+          transformOrigin: 'top left',
+        }}
+      />
+    </div>
+  );
+}
 
 export function ModelRegistryEditor() {
   const models = useModels((s) => s.models);
   const setModels = useModels((s) => s.setModels);
   const resetModels = useModels((s) => s.resetModels);
   const heroes = useWorld((s) => s.heroes);
+  const themeId = useSettings((s) => s.themeId);
   const t = useUi();
 
-  // Distinct models seen in current sessions.
-  const seen = useMemo(() => {
-    const set = new Set<string>();
-    for (const h of Object.values(heroes)) if (h.model) set.add(h.model);
-    return [...set];
-  }, [heroes]);
+  // Odrębne modele widziane w bieżących sesjach + providerzy, pod którymi je uruchamiano.
+  const seen = useMemo(() => seenModelsByAgent(Object.values(heroes)), [heroes]);
 
-  const setSprites = (sprites: SpriteRule[]) => setModels({ ...models, sprites });
+  const groups = useMemo(() => groupBySprite(models), [models]);
   const setWindows = (windows: WindowRule[]) => setModels({ ...models, windows });
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div style={{ fontSize: 12, opacity: 0.75 }}>{t.modelsHint}</div>
 
-      {/* Widziane modele — prosta wersja: dopasowanie sprite/okno + flaga fallback. */}
+      {/* Widziane modele — miniatura spirita + okno + flaga fallback. */}
       {seen.length > 0 && (
         <div className="cov-strip" style={{ flexDirection: 'column', alignItems: 'stretch', gap: 6 }}>
           <span className="px" style={{ opacity: 0.7, textTransform: 'uppercase', letterSpacing: '0.05em', fontSize: 11 }}>
             {t.seenModels}
           </span>
-          {seen.map((m) => {
+          {seen.map(({ model, agents }) => {
             const matched =
-              models.sprites.some((r) => matchModel(m, r.match)) ||
-              models.windows.some((r) => matchModel(m, r.match));
+              models.sprites.some((r) => matchModel(model, r.match)) ||
+              models.windows.some((r) => matchModel(model, r.match));
             return (
-              <div key={m} style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <code style={{ opacity: 0.9 }}>{m}</code>
-                <span className="bre-chip bre-chip--exact">{resolveSprite(m, models).sprite}</span>
-                <span className="bre-chip bre-chip--prefix">{formatK(resolveContextWindow(m, models))}</span>
+              <div key={model} style={{ display: 'flex', gap: 8, fontSize: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <SpriteThumb themeId={themeId} sprite={resolveSprite(model, models).sprite} size={28} />
+                <code style={{ opacity: 0.9 }}>{model}</code>
+                <span className="bre-chip bre-chip--exact">{resolveSprite(model, models).sprite}</span>
+                <span className="bre-chip bre-chip--prefix">{formatK(resolveContextWindow(model, models))}</span>
+                {agents.map((a) => (
+                  <ProviderEmblem key={a} agent={a} variant="chip" />
+                ))}
                 {!matched && <span style={{ color: '#ef9f27' }}>⚠ {t.usesFallback}</span>}
               </div>
             );
@@ -60,24 +98,26 @@ export function ModelRegistryEditor() {
         </div>
       )}
 
-      {/* Identity axis. */}
-      <Section title={`👤 ${t.spriteAndName}`}>
-        {models.sprites.map((r, i) => (
-          <SpriteRow
-            key={i}
-            rule={r}
-            t={t}
-            onChange={(next) => setSprites(models.sprites.map((x, j) => (j === i ? next : x)))}
-            onRemove={() => setSprites(models.sprites.filter((_, j) => j !== i))}
-          />
-        ))}
-        <button
-          className="bre-addbtn"
-          onClick={() => setSprites([...models.sprites, { match: { kind: 'pattern', pattern: '' }, sprite: SPRITE_IDS[0] }])}
-        >
-          {t.addRow}
-        </button>
-      </Section>
+      {/* Tożsamość — karty per spirit z grafiką (jak karty budynków). */}
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+        <div className="px" style={{ fontSize: 13 }}>{`👤 ${t.spriteAndName}`}</div>
+        <div className="bre-grid">
+          {SPRITE_IDS.map((s) => (
+            <SpriteCard
+              key={s}
+              sprite={s}
+              themeId={themeId}
+              group={groups[s]}
+              isDefault={models.fallback.sprite === s}
+              t={t}
+              onAddModel={(pattern, name) => setModels(addSpriteModel(models, s, pattern, name))}
+              onRemoveRule={(index) => setModels(removeSpriteRule(models, index))}
+              onRename={(name) => setModels(renameSprite(models, s, name))}
+              onSetDefault={() => setModels(setFallbackSprite(models, s))}
+            />
+          ))}
+        </div>
+      </div>
 
       {/* Capacity axis. */}
       <Section title={`📦 ${t.contextWindowSection}`}>
@@ -98,17 +138,9 @@ export function ModelRegistryEditor() {
         </button>
       </Section>
 
-      {/* Fallback (niedopasowane). */}
+      {/* Domyślne okno (niedopasowane). Domyślny sprite ustawiasz na kartach wyżej. */}
       <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap', fontSize: 12 }}>
         <span className="px" style={{ opacity: 0.7 }}>{t.fallbackLabel}:</span>
-        <select
-          className="bre-input"
-          aria-label={t.spriteLabel}
-          value={models.fallback.sprite}
-          onChange={(e) => setModels({ ...models, fallback: { ...models.fallback, sprite: e.target.value as SpriteId } })}
-        >
-          {SPRITE_IDS.map((s) => <option key={s} value={s}>{s}</option>)}
-        </select>
         <input
           className="bre-input"
           style={{ width: 110 }}
@@ -129,6 +161,88 @@ export function ModelRegistryEditor() {
 
       <div>
         <button className="ghost" onClick={resetModels}>↺ {t.restoreDefaults}</button>
+      </div>
+    </div>
+  );
+}
+
+/** Karta jednego spirita: grafika + nazwa + chipy model-wzorców + znacznik domyślnego. */
+function SpriteCard({
+  sprite,
+  themeId,
+  group,
+  isDefault,
+  t,
+  onAddModel,
+  onRemoveRule,
+  onRename,
+  onSetDefault,
+}: {
+  sprite: SpriteId;
+  themeId: string;
+  group: SpriteGroup;
+  isDefault: boolean;
+  t: UiStrings;
+  onAddModel: (pattern: string, name?: string) => void;
+  onRemoveRule: (index: number) => void;
+  onRename: (name: string) => void;
+  onSetDefault: () => void;
+}) {
+  const [nameVal, setNameVal] = useState(group.name ?? '');
+  const [modelVal, setModelVal] = useState('');
+
+  // Sync nazwy gdy zmieni się z zewnątrz (import JSON / reset / dodanie pierwszego modelu).
+  useEffect(() => setNameVal(group.name ?? ''), [group.name]);
+
+  const commitModel = () => {
+    if (modelVal.trim()) onAddModel(modelVal.trim(), nameVal.trim() || undefined);
+    setModelVal('');
+  };
+
+  return (
+    <div className="bre-card">
+      <SpriteThumb themeId={themeId} sprite={sprite} />
+      <div style={{ minWidth: 0, flex: 1 }}>
+        <div className="px" style={{ fontSize: 13.5, marginBottom: 6, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+          <input
+            className="bre-input"
+            style={{ width: 130 }}
+            placeholder={t.displayNameLabel}
+            value={nameVal}
+            onChange={(e) => {
+              setNameVal(e.target.value);
+              onRename(e.target.value);
+            }}
+          />
+          <span style={{ opacity: 0.45, fontWeight: 400 }}>· {sprite}</span>
+          {isDefault ? (
+            <span style={{ opacity: 0.6, fontSize: 11 }}>· {t.defaultMark}</span>
+          ) : (
+            <button className="bre-addbtn" style={{ fontSize: 11 }} onClick={onSetDefault}>{t.setDefault}</button>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+          {group.rules.map(({ match, index }) => (
+            <span key={index} className="bre-chip bre-chip--exact">
+              {match.kind === 'exact' ? `= ${match.id}` : match.pattern}
+              <button onClick={() => onRemoveRule(index)} aria-label={t.remove}>✕</button>
+            </span>
+          ))}
+          <input
+            className="bre-input"
+            style={{ width: 120 }}
+            placeholder={t.matchValue}
+            value={modelVal}
+            onChange={(e) => setModelVal(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') commitModel();
+            }}
+          />
+          {modelVal.trim() && (
+            <button className="bre-addbtn" onClick={commitModel} aria-label={t.addRow}>✓</button>
+          )}
+        </div>
       </div>
     </div>
   );
@@ -168,30 +282,6 @@ function MatchEditor({ match, t, onChange }: { match: ModelMatch; t: UiStrings; 
         }
       />
     </>
-  );
-}
-
-function SpriteRow({ rule, t, onChange, onRemove }: { rule: SpriteRule; t: UiStrings; onChange: (r: SpriteRule) => void; onRemove: () => void }) {
-  return (
-    <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap' }}>
-      <MatchEditor match={rule.match} t={t} onChange={(match) => onChange({ ...rule, match })} />
-      <select
-        className="bre-input"
-        aria-label={t.spriteLabel}
-        value={rule.sprite}
-        onChange={(e) => onChange({ ...rule, sprite: e.target.value as SpriteId })}
-      >
-        {SPRITE_IDS.map((s) => <option key={s} value={s}>{s}</option>)}
-      </select>
-      <input
-        className="bre-input"
-        style={{ width: 120 }}
-        placeholder={t.displayNameLabel}
-        value={rule.displayName ?? ''}
-        onChange={(e) => onChange({ ...rule, displayName: e.target.value || undefined })}
-      />
-      <button className="bre-addbtn" onClick={onRemove} aria-label={t.remove}>✕</button>
-    </div>
   );
 }
 

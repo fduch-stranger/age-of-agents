@@ -91,6 +91,7 @@ export const useWorld = create<WorldStore>((set) => ({
                 return acc;
               }, new Map<string, TranscriptLine[]>()),
             ),
+            arsenal: Object.fromEntries((event.arsenals ?? []).map((a) => [a.projectDir, a])),
           };
         case 'hero-spawned':
         case 'hero-updated': {

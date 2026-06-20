@@ -27,6 +27,15 @@ const STALE_SESSION_MS = 5 * 60_000;
  * memory does not grow forever. = HISTORICAL_WINDOW_MS. */
 const SESSION_RETENTION_MS = HISTORICAL_WINDOW_MS;
 
+function isSchemaMismatchError(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  // Trwały dryf schematu OpenCode: usunięta kolumna („no such column") albo
+  // usunięta/przemianowana tabela („no such table" — query robi LEFT JOIN project).
+  // To są błędy z SELECT-a; „has no column named" pochodzi tylko z INSERT/UPDATE,
+  // a baza jest otwierana readonly, więc tu nieosiągalne.
+  return /no such column/i.test(message) || /no such table/i.test(message);
+}
+
 interface SessionState {
   tracker: SessionTracker;
   lastPartTime: number;
@@ -68,7 +77,7 @@ export class OpenCodePoller {
       // Pierwsze odpytanie natychmiast
       await this.poll();
       
-      console.log('[OpenCode] Poller started');
+      if (this.isRunning) console.log('[OpenCode] Poller started');
     } catch (err) {
       console.warn('[OpenCode] Could not start poller:', err instanceof Error ? err.message : String(err));
       console.log('[OpenCode] Make sure better-sqlite3 is installed: npm install better-sqlite3');
@@ -132,6 +141,16 @@ export class OpenCodePoller {
       // Remove sessions older than retention window so memory does not grow.
       this.sweep();
     } catch (err) {
+      if (isSchemaMismatchError(err)) {
+        // Niezgodność schematu (np. nowsza wersja OpenCode usunęła kolumny z `session`)
+        // nie naprawi się sama przy kolejnym pollu — zatrzymaj pollera zamiast
+        // logować ten sam błąd co sekundę w nieskończoność.
+        console.warn('[OpenCode] Poll error, stopping poller:', err instanceof Error ? err.message : String(err));
+        await this.stop();
+        return;
+      }
+      // Nieoczekiwany/przejściowy błąd: zachowaj pełny obiekt (stack) — to klasa
+      // błędów, gdzie ślad jest najcenniejszy. Spam ogranicza tylko gałąź schema-stop.
       console.error('[OpenCode] Poll error:', err);
     }
   }

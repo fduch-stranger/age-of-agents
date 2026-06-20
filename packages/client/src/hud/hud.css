@@ -119,6 +119,7 @@
 }
 
 .portrait {
+  position: relative; /* kotwica dla .emblem-badge w rogu */
   width: 56px;
   height: 56px;
   border-radius: 6px;
@@ -161,6 +162,15 @@
   white-space: nowrap;
 }
 
+/* Herb providera w prawym-górnym rogu kafelka sesji (dodatkowy wskaźnik „co to za agent"). */
+.portrait .emblem-badge {
+  position: absolute;
+  top: 3px;
+  right: 3px;
+  line-height: 0;
+  pointer-events: none;
+}
+
 .resources {
   top: 12px;
   right: 12px;
@@ -179,12 +189,40 @@
   overflow-y: auto;
 }
 
-.missions h3 {
+.missions-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
   margin: 0 0 6px;
+  padding: 0;
+  background: none;
+  border: none;
+  font: inherit;
   font-size: 12px;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  color: #fac775;
+  opacity: 0.85;
+  cursor: pointer;
+}
+.missions-head:hover {
+  opacity: 1;
+}
+.missions-head .chevron {
+  font-size: 10px;
+  width: 12px;
+  flex: none;
+  opacity: 0.8;
+}
+.missions-head .count {
+  font-size: 11px;
   opacity: 0.7;
+  flex: none;
+}
+/* Zwinięty: tylko pasek tytułu — zero dolnego marginesu nagłówka. */
+.missions.collapsed .missions-head {
+  margin-bottom: 0;
 }
 
 .mission {

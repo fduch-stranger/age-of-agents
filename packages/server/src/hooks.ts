@@ -25,9 +25,22 @@ export interface HookPayload {
   tool_input?: Record<string, unknown>;
   model?: string;
   permission_mode?: string;
+  message?: string;
+  source?: string;
 }
 
-export function translateHook(payload: HookPayload): { sessionId: string; projectDir: string; facts: Fact[] } | null {
+/**
+ * Notification odpala się DWOMA torami: realną prośbą o akcję ("Claude needs your
+ * permission to use Bash") oraz ciszą ~60 s po zakończonej turze ("Claude is waiting
+ * for your input"). Tylko ten pierwszy to pytanie do usera — drugi NIE ma podbijać
+ * spoczywającego bohatera w wieczny alarm "!". Wzorzec celowo wąski; nieznane
+ * komunikaty traktujemy zachowawczo jako alarm (zwracamy false).
+ */
+function isIdleWaitingNotice(message: string | undefined): boolean {
+  return typeof message === 'string' && /waiting for (your )?input/i.test(message);
+}
+
+export function translateHook(payload: HookPayload): { sessionId: string; projectDir: string; cwd?: string; facts: Fact[] } | null {
   const sessionId = payload.session_id;
   if (!sessionId) return null;
   const projectDir = payload.cwd ? basename(payload.cwd) : 'nieznany';
@@ -37,6 +50,7 @@ export function translateHook(payload: HookPayload): { sessionId: string; projec
   switch (payload.hook_event_name) {
     case 'SessionStart':
       facts.push({ kind: 'meta', model: payload.model, permissionMode: payload.permission_mode, cwd: payload.cwd });
+      if (payload.source === 'clear') facts.push({ kind: 'cleared', ts });
       break;
     case 'UserPromptSubmit':
       if (payload.prompt) facts.push({ kind: 'prompt', text: payload.prompt.slice(0, 240), ts });
@@ -56,7 +70,7 @@ export function translateHook(payload: HookPayload): { sessionId: string; projec
       facts.push({ kind: 'thinking', ts });
       break;
     case 'Notification':
-      facts.push({ kind: 'awaiting', ts });
+      if (!isIdleWaitingNotice(payload.message)) facts.push({ kind: 'awaiting', ts });
       break;
     case 'Stop':
       facts.push({ kind: 'turn-end', ts });
@@ -65,7 +79,7 @@ export function translateHook(payload: HookPayload): { sessionId: string; projec
       return null;
   }
 
-  return facts.length > 0 ? { sessionId, projectDir, facts } : null;
+  return facts.length > 0 ? { sessionId, projectDir, cwd: payload.cwd, facts } : null;
 }
 
 // --- Installer: merge hook entries into ~/.claude/settings.json ---

@@ -244,9 +244,26 @@ describe('interpretCodexLine', () => {
     expect(web.find((f) => f.kind === 'tool-start')).toMatchObject({ kind: 'tool-start', tool: 'WebSearch', detail: 'rust async' });
   });
 
-  it('token_count -> usage-total; task_complete -> turn-end', () => {
-    expect(interpretCodexLine(line({ type: 'event_msg', payload: { type: 'token_count', info: { total_token_usage: { input_tokens: 1200, output_tokens: 300 } } } })))
-      .toContainEqual({ kind: 'usage-total', input: 1200, output: 300 });
+  it('token_count → usage-total with current context when present; task_complete → turn-end', () => {
+    expect(interpretCodexLine(line({
+      type: 'event_msg',
+      payload: {
+        type: 'token_count',
+        info: {
+          total_token_usage: { input_tokens: 1200, output_tokens: 300 },
+          last_token_usage: { input_tokens: 700, output_tokens: 40, total_tokens: 740 },
+          model_context_window: 258400,
+        },
+      },
+    })))
+      .toContainEqual({
+        kind: 'usage-total',
+        input: 1200,
+        output: 300,
+        context: 700,
+        contextWindow: 258400,
+        last: { input: 700, output: 40 },
+      });
     expect(interpretCodexLine(line({ type: 'event_msg', timestamp: '2026-06-14T10:05:00.000Z', payload: { type: 'task_complete' } })))
       .toContainEqual({ kind: 'turn-end', ts: '2026-06-14T10:05:00.000Z' });
   });
@@ -275,10 +292,13 @@ describe('helpers (tuning points)', () => {
     expect(codexToolToCanonical('functions.write_stdin')).toBe('Bash');
     expect(codexToolToCanonical('functions.request_user_input')).toBe('AskUserQuestion');
     expect(codexToolToCanonical('functions.view_image')).toBe('Read');
+    expect(codexToolToCanonical('functions.apply_patch')).toBe('Edit');
+    expect(codexToolToCanonical('web.run')).toBe('WebSearch');
     expect(codexToolToCanonical('functions.update_goal')).toBe('Workflow');
     expect(codexToolToCanonical('functions.create_goal')).toBe('Workflow');
     expect(codexToolToCanonical('functions.get_goal')).toBe('Workflow');
     expect(codexToolToCanonical('functions.exec_command')).toBe('Bash');
+    expect(codexToolToCanonical('multi_tool_use.parallel')).toBe('Workflow');
     expect(codexToolToCanonical('tool_search.tool_search_tool')).toBe('ToolSearch');
     expect(codexToolToCanonical('image_gen.imagegen')).toBe('Edit');
     expect(codexToolToCanonical('mcp__server__tool')).toBe('mcp__server__tool');

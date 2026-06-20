@@ -56,6 +56,7 @@ export interface UiStrings {
   agents: string;
   allCities: string;
   language: string;
+  flipCity: string;
   symbols: string;
   edges: string;
   communities: string;
@@ -109,6 +110,8 @@ export interface UiStrings {
   windowLabel: string;
   fallbackLabel: string;
   addRow: string;
+  defaultMark: string;
+  setDefault: string;
 }
 
 const EN: UiStrings = {
@@ -169,6 +172,7 @@ const EN: UiStrings = {
   agents: 'agents',
   allCities: 'All',
   language: 'Language',
+  flipCity: 'Mirror city horizontally',
   symbols: 'Symbols',
   edges: 'Edges',
   communities: 'Communities',
@@ -220,6 +224,8 @@ const EN: UiStrings = {
   windowLabel: 'tokens',
   fallbackLabel: 'Default (unmatched)',
   addRow: '+ add',
+  defaultMark: 'default',
+  setDefault: 'set default',
 };
 
 const PL: UiStrings = {
@@ -280,6 +286,7 @@ const PL: UiStrings = {
   agents: 'agentów',
   allCities: 'Wszystkie',
   language: 'Język',
+  flipCity: 'Odbij miasto poziomo',
   symbols: 'Symbole',
   edges: 'Krawędzie',
   communities: 'Społeczności',
@@ -331,6 +338,8 @@ const PL: UiStrings = {
   windowLabel: 'tokeny',
   fallbackLabel: 'Domyślne (niedopasowane)',
   addRow: '+ dodaj',
+  defaultMark: 'domyślny',
+  setDefault: 'ustaw domyślny',
 };
 
 const IT: UiStrings = {
@@ -391,6 +400,7 @@ const IT: UiStrings = {
   agents: 'agenti',
   allCities: 'Tutte',
   language: 'Lingua',
+  flipCity: 'Ribalta la città in orizzontale',
   symbols: 'Simboli',
   edges: 'Archi',
   communities: 'Comunità',
@@ -442,6 +452,8 @@ const IT: UiStrings = {
   windowLabel: 'token',
   fallbackLabel: 'Predefinito (non abbinato)',
   addRow: '+ aggiungi',
+  defaultMark: 'predefinito',
+  setDefault: 'imposta predefinito',
 };
 
 const UI: Record<Lang, UiStrings> = { en: EN, pl: PL, it: IT };

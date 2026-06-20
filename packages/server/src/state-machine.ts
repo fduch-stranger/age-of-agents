@@ -31,6 +31,8 @@ export const DEFAULT_THRESHOLDS: StateThresholds = {
   peonDoneAfterMs: 90_000,
 };
 
+type SessionTrackerExtra = Partial<Pick<HeroSnapshot, 'container'>>;
+
 /**
  * State machine for one session: consumes Facts (from transcript or hooks) and
  * mutates World. Knows neither JSONL format nor data source.
@@ -39,6 +41,7 @@ export class SessionTracker {
   private seenUsage = new Set<string>();
   private _tokens = { input: 0, output: 0 };
   private contextTokens?: number;
+  private contextWindowTokens?: number;
   /** Public getter for comparing with new values (for example in OpenCode poller). */
   get tokens(): { input: number; output: number } {
     return this._tokens;
@@ -65,6 +68,8 @@ export class SessionTracker {
     private readonly projectDir: string,
     private readonly thresholds: StateThresholds = DEFAULT_THRESHOLDS,
     private readonly agent: AgentKind = 'claude',
+    /** Static fields mixed into the hero and preserved across patches. */
+    private readonly extra: SessionTrackerExtra = {},
   ) {}
 
   private wielded(): WieldedArsenal {
@@ -91,9 +96,11 @@ export class SessionTracker {
       tokens: this.tokens,
       recentActions: this.recentActions,
       contextTokens: this.contextTokens,
+      contextWindowTokens: this.contextWindowTokens,
       wielded: this.wielded(),
       startedAt: now,
       lastActivityAt: now,
+      ...(this.extra.container ? { container: this.extra.container } : {}),
     };
   }
 
@@ -195,7 +202,12 @@ export class SessionTracker {
             output: this.tokens.output + fact.output,
           };
           if (typeof fact.context === 'number') this.contextTokens = fact.context;
-          this.patch({ tokens: this._tokens, ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}) });
+          if (typeof fact.contextWindow === 'number') this.contextWindowTokens = fact.contextWindow;
+          this.patch({
+            tokens: this._tokens,
+            ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}),
+            ...(typeof fact.contextWindow === 'number' ? { contextWindowTokens: fact.contextWindow } : {}),
+          });
         }
         break;
 
@@ -203,9 +215,11 @@ export class SessionTracker {
         // Codex: token_count is cumulative -> SET, do not add.
         this._tokens = { input: fact.input, output: fact.output };
         if (typeof fact.context === 'number') this.contextTokens = fact.context;
+        if (typeof fact.contextWindow === 'number') this.contextWindowTokens = fact.contextWindow;
         this.patch({
           tokens: this._tokens,
           ...(typeof fact.context === 'number' ? { contextTokens: fact.context } : {}),
+          ...(typeof fact.contextWindow === 'number' ? { contextWindowTokens: fact.contextWindow } : {}),
         });
         break;
 
@@ -213,6 +227,11 @@ export class SessionTracker {
         if (fact.isError) {
           this.errorUntil = Date.now() + this.thresholds.errorFlashMs;
           this.patch({ state: 'error' }, fact.ts);
+        } else if (this.world.getHero(this.sessionId)?.state === 'awaiting-input') {
+          // Odpowiedź usera na AskUserQuestion/ExitPlanMode: gasimy "!" od razu.
+          // Nie czekamy, aż w transkrypcie pojawi się blok 'thinking' (bywa, że
+          // kontynuacja jest samym tekstem) — inaczej bohater wisiał w awaiting-input.
+          this.patch({ state: 'thinking', currentTool: undefined, toolDetail: undefined }, fact.ts);
         }
         break;
 
@@ -235,6 +254,13 @@ export class SessionTracker {
 
       case 'awaiting':
         this.patch({ state: 'awaiting-input', currentTool: undefined }, fact.ts);
+        break;
+
+      case 'cleared':
+        {
+          const parsed = Date.parse(fact.ts);
+          this.patch({ clearedAt: Number.isFinite(parsed) ? parsed : Date.now() }, fact.ts);
+        }
         break;
     }
   }

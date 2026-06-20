@@ -3,13 +3,7 @@ import { useWorld } from '../store';
 import { useUi } from '../i18n';
 import { useMenuKeyboard } from './useMenuKeyboard';
 import type { AgentKind, HeroStateKind } from '@agent-citadel/shared';
-
-const AGENT_BADGE: Record<AgentKind, { label: string; color: string } | undefined> = {
-  claude: undefined,
-  codex: { label: 'C', color: '#10a37f' },
-  opencode: { label: 'O', color: '#f59e0b' },
-  koda: { label: 'K', color: '#8b5cf6' },
-};
+import { ProviderEmblem } from './ProviderEmblem';
 
 /** Emoji per agent state (visual flourish in city buttons). */
 const STATE_ICON: Record<HeroStateKind, string> = {
@@ -167,7 +161,7 @@ export function ProjectSwitcher() {
       className="hud-panel px"
       style={{
         position: 'absolute',
-        top: 16,
+        top: 12,
         left: '50%',
         transform: 'translateX(-50%)',
         padding: 0,
@@ -318,29 +312,9 @@ function CityMeta({ city, active }: { city: CityInfo; active: boolean }) {
     <>
       {city.agents.size > 0 && (
         <span style={{ display: 'flex', gap: 2 }}>
-          {[...city.agents].map((a) => {
-            const badge = AGENT_BADGE[a];
-            if (!badge) return null;
-            return (
-              <span
-                key={a}
-                title={badge.label}
-                style={{
-                  background: badge.color,
-                  color: '#15140f',
-                  width: 14,
-                  height: 14,
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 9,
-                  fontWeight: 700,
-                }}
-              >
-                {badge.label[0]}
-              </span>
-            );
-          })}
+          {[...city.agents].map((a) => (
+            <ProviderEmblem key={a} agent={a} variant="chip" />
+          ))}
         </span>
       )}
       {topStates.length > 0 && (

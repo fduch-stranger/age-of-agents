@@ -1,26 +1,22 @@
-import { AnimatedSprite, Container, Graphics, Text, type Spritesheet } from 'pixi.js';
-import type { AgentKind, HeroStateKind } from '@agent-citadel/shared';
+import { AnimatedSprite, Container, Graphics, Sprite, Text, type Spritesheet } from 'pixi.js';
+import { resolveProvider, type AgentKind, type HeroStateKind } from '@agent-citadel/shared';
+import { getEmblemTexture } from './emblems';
 import type { Projection } from './projection';
 import type { PathNode } from './pathfind';
 import { buildUnitBody, labelStyle, teamColor } from './placeholders';
 import { stateToAnimation } from './archetype';
+import { contextColor } from '../context-progress';
 
 const SPEED_GRID_PER_S = 2.2;
 /** How long (s) the work bubble stays visible after content changes (then hide to declutter). */
 const BUBBLE_TTL = 7;
+const CONTEXT_BAR_W = 30;
+const CONTEXT_BAR_H = 4;
 
 /** Default sprite scale (fantasy/standard ~68px). Theme overrides via ThemeDef.heroSprite. */
 const SPRITE_SCALE = 0.8;
 /** Default foot anchor Y (fantasy/standard: row 57-59/68 -> 0.87). Overridden per theme. */
 const SPRITE_FOOT_ANCHOR = 0.87;
-/** Agent badge colors (Claude does not get a badge). */
-const AGENT_BADGE_COLORS: Record<AgentKind, number | undefined> = {
-  claude: undefined,
-  codex: 0x10a37f, // OpenAI green
-  opencode: 0xf59e0b, // amber-500
-  koda: 0x8b5cf6, // violet-500
-};
-
 /**
  * Unit on the map (hero or peon): position on the logical grid,
  * waypoint movement, state overlays (aura, exclamation, smoke, zzz)
@@ -38,6 +34,10 @@ export class Unit {
   private crate = new Graphics();
   private teamRing = new Graphics();
   private selectionRing = new Graphics();
+  private contextBar = new Container();
+  private contextTrack = new Graphics();
+  private contextFill = new Graphics();
+  private contextProgress?: number;
   private selected = false;
   private overlay = new Text({ text: '', style: labelStyle });
   private bubble = new Text({ text: '', style: { ...labelStyle, fontSize: 10 } });
@@ -109,7 +109,13 @@ export class Unit {
     this.nameTag.position.set(0, 6);
     this.nameTag.alpha = 0.9;
 
-    this.container.addChild(this.aura, this.selectionRing, this.teamRing, this.body, this.crate, this.overlay, this.bubble, this.nameTag);
+    this.contextTrack.rect(-CONTEXT_BAR_W / 2 - 1, -1, CONTEXT_BAR_W + 2, CONTEXT_BAR_H + 2).fill(0x0b0b0a);
+    this.contextTrack.rect(-CONTEXT_BAR_W / 2, 0, CONTEXT_BAR_W, CONTEXT_BAR_H).fill({ color: 0x2a2926, alpha: 0.95 });
+    this.contextBar.position.set(0, isPeon ? -30 : -39);
+    this.contextBar.visible = false;
+    this.contextBar.addChild(this.contextTrack, this.contextFill);
+
+    this.container.addChild(this.aura, this.selectionRing, this.teamRing, this.body, this.crate, this.contextBar, this.overlay, this.bubble, this.nameTag);
 
     const badge = buildAgentBadge(agent);
     if (badge) this.container.addChild(badge);
@@ -119,6 +125,24 @@ export class Unit {
 
   setCrate(visible: boolean): void {
     this.crate.visible = visible;
+  }
+
+  setContextProgress(pct: number | undefined): void {
+    if (typeof pct !== 'number' || !Number.isFinite(pct)) {
+      this.contextBar.visible = false;
+      this.contextProgress = undefined;
+      this.contextFill.clear();
+      return;
+    }
+    const clamped = Math.max(0, Math.min(100, Math.round(pct)));
+    this.contextBar.visible = true;
+    if (this.contextProgress === clamped) return;
+    this.contextProgress = clamped;
+    const fillW = Math.round((CONTEXT_BAR_W * clamped) / 100);
+    this.contextFill.clear();
+    if (fillW > 0) {
+      this.contextFill.rect(-CONTEXT_BAR_W / 2, 0, fillW, CONTEXT_BAR_H).fill(parseInt(contextColor(clamped).slice(1), 16));
+    }
   }
 
   setName(name: string): void {
@@ -164,6 +188,7 @@ export class Unit {
     const dimmed = state === 'sleeping';
     this.body.alpha = dimmed ? 0.45 : 1;
     this.nameTag.alpha = dimmed ? 0.45 : 0.9;
+    this.contextBar.alpha = dimmed ? 0.45 : 1;
   }
 
   update(dtSeconds: number): void {
@@ -242,22 +267,35 @@ function clip(text: string, max: number): string {
   return text.length > max ? `${text.slice(0, max - 1)}…` : text;
 }
 
-/** Small agent-origin badge (non-Claude only). Drawn procedurally, without assets. */
+/** Odznaka pochodzenia agenta przy głowie jednostki. Warstwa podstawowa: graficzny herb
+ *  (tekstura z loadEmblems). Brak tekstury → fallback proceduralny: kółko + litera z
+ *  AGENT_PROVIDERS (tylko nie-Claude; kolor CSS '#rrggbb' → liczba Pixi). */
 function buildAgentBadge(agent: AgentKind): Container | undefined {
-  const color = AGENT_BADGE_COLORS[agent];
-  if (!color) return undefined;
-  
+  const provider = resolveProvider(agent);
+  if (provider.color === null) return undefined;
+
   const c = new Container();
+  c.position.set(10, -30); // przy głowie, prawy-górny róg jednostki
+
+  const tex = getEmblemTexture(provider.kind);
+  if (tex) {
+    const sprite = new Sprite(tex);
+    sprite.anchor.set(0.5);
+    sprite.width = 22;
+    sprite.height = 22;
+    c.addChild(sprite);
+    return c;
+  }
+
+  // Fallback proceduralny — tylko providerzy z kolorem.
   const g = new Graphics();
+  const color = parseInt(provider.color.slice(1), 16);
   g.circle(0, 0, 7).fill({ color }).stroke({ color: 0x0b0b0a, width: 1.5 });
   c.addChild(g);
-  
-  // Litera per agent
-  const letterText = agent === 'codex' ? 'C' : agent === 'opencode' ? 'O' : agent === 'koda' ? 'K' : '?';
-  const letter = new Text({ text: letterText, style: { ...labelStyle, fontSize: 9, fill: 0xffffff } });
+
+  const letter = new Text({ text: provider.labelShort, style: { ...labelStyle, fontSize: 9, fill: 0xffffff } });
   letter.anchor.set(0.5);
   c.addChild(letter);
-  
-  c.position.set(10, -30); // near the head, top-right corner of the unit
+
   return c;
 }

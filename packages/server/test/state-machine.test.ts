@@ -40,6 +40,35 @@ describe('SessionTracker', () => {
     expect(done && done.type === 'mission-completed' && done.mission.status).toBe('completed');
   });
 
+  it('odpowiedź (tool-result sukces) gasi awaiting-input nawet bez bloku thinking', () => {
+    // Regresja: po odpowiedzi na AskUserQuestion bohater zostawał z żółtym "!".
+    // Sama odpowiedź (tool-result) musi wyprowadzić z awaiting-input → thinking.
+    const { world, tracker } = setup();
+    tracker.apply({ kind: 'tool-start', tool: 'AskUserQuestion', messageId: 'm1', ts: '2026-06-19T10:00:00.000Z' });
+    expect(world.getHero('session-1')?.state).toBe('awaiting-input');
+    tracker.apply({ kind: 'tool-result', isError: false, ts: '2026-06-19T10:00:05.000Z' });
+    expect(world.getHero('session-1')?.state).toBe('thinking');
+  });
+
+  it('tool-result (sukces) podczas working NIE rusza stanu', () => {
+    // Gaszenie dotyczy wyłącznie awaiting-input — zwykłe narzędzia zostają w working.
+    const { world, tracker } = setup();
+    tracker.apply({ kind: 'tool-start', tool: 'Bash', messageId: 'm1', ts: '2026-06-19T10:00:00.000Z' });
+    expect(world.getHero('session-1')?.state).toBe('working');
+    tracker.apply({ kind: 'tool-result', isError: false, ts: '2026-06-19T10:00:01.000Z' });
+    expect(world.getHero('session-1')?.state).toBe('working');
+  });
+
+  it('cleared uses event time for clearedAt and lastActivityAt', () => {
+    const { world, tracker } = setup();
+    const ts = '2026-06-19T10:00:05.000Z';
+
+    tracker.apply({ kind: 'cleared', ts });
+
+    expect(world.getHero('session-1')?.clearedAt).toBe(Date.parse(ts));
+    expect(world.getHero('session-1')?.lastActivityAt).toBe(ts);
+  });
+
   it('deduplicates usage by messageId (one request = many lines)', () => {
     const { world, tracker } = setup();
     tracker.apply({ kind: 'usage', messageId: 'm1', input: 100, output: 50 });
@@ -62,10 +91,12 @@ describe('SessionTracker', () => {
     tracker.apply({ kind: 'usage-total', input: 37049245, output: 178333, context: 180825, contextWindow: 258400 });
     expect(world.getHero('sCodexUsage')?.tokens).toEqual({ input: 37049245, output: 178333 });
     expect(world.getHero('sCodexUsage')?.contextTokens).toBe(180825);
+    expect(world.getHero('sCodexUsage')?.contextWindowTokens).toBe(258400);
 
     tracker.apply({ kind: 'usage-total', input: 37200000, output: 178900, context: 20116, contextWindow: 258400 });
     expect(world.getHero('sCodexUsage')?.tokens).toEqual({ input: 37200000, output: 178900 });
     expect(world.getHero('sCodexUsage')?.contextTokens).toBe(20116);
+    expect(world.getHero('sCodexUsage')?.contextWindowTokens).toBe(258400);
   });
 
   it('agent from constructor lands in HeroSnapshot', () => {
@@ -146,9 +177,10 @@ describe('SessionTracker', () => {
   it('contextTokens = context from the LATEST message (not a sum)', () => {
     const world = new World();
     const tracker = new SessionTracker(world, 'sCtx', 'PD');
-    tracker.apply({ kind: 'usage', messageId: 'm1', input: 10, output: 1, context: 1000 });
-    tracker.apply({ kind: 'usage', messageId: 'm2', input: 10, output: 1, context: 1800 });
+    tracker.apply({ kind: 'usage', messageId: 'm1', input: 10, output: 1, context: 1000, contextWindow: 2000 });
+    tracker.apply({ kind: 'usage', messageId: 'm2', input: 10, output: 1, context: 1800, contextWindow: 4000 });
     expect(world.getHero('sCtx')!.contextTokens).toBe(1800);
+    expect(world.getHero('sCtx')!.contextWindowTokens).toBe(4000);
   });
 
   it('accumulates wielded from attribution facts on the hero', () => {

@@ -3,6 +3,7 @@ import type {
   HeroSnapshot,
   MissionSnapshot,
   PeonSnapshot,
+  ProjectArsenal,
   TranscriptLine,
   WorldSnapshot,
 } from '@agent-citadel/shared';
@@ -20,6 +21,7 @@ export class World {
   private peons = new Map<string, PeonSnapshot>();
   private missions = new Map<string, MissionSnapshot>();
   private transcripts = new Map<string, TranscriptLine[]>();
+  private arsenals = new Map<string, ProjectArsenal>();
   private listeners = new Set<Listener>();
   private nextTeamColor = 0;
 
@@ -46,7 +48,13 @@ export class World {
       peons: [...this.peons.values()],
       missions: [...this.missions.values()],
       transcripts: [...this.transcripts.values()].flatMap((lines) => lines),
+      arsenals: [...this.arsenals.values()],
     };
+  }
+
+  setArsenal(arsenal: ProjectArsenal): void {
+    this.arsenals.set(arsenal.projectDir, arsenal);
+    this.emit({ type: 'arsenal-updated', arsenal });
   }
 
   /** Returns unique active project directories (currently working sessions).

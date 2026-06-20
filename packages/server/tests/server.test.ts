@@ -110,6 +110,105 @@ describe('startServer', () => {
     }
   });
 
+  it('starts and stops Docker poller when Claude source is enabled', async () => {
+    const prev = process.env.AOA_SOURCES;
+    const watcherStart = vi.fn();
+    const watcherStop = vi.fn().mockResolvedValue(undefined);
+    const dockerStart = vi.fn().mockResolvedValue(undefined);
+    const dockerStop = vi.fn();
+    let localRunning: RunningServer | undefined;
+
+    vi.resetModules();
+    vi.doMock('../src/watcher.js', () => ({
+      SourceWatcher: vi.fn().mockImplementation((_world, source) => ({
+        id: source.id,
+        start: watcherStart,
+        stop: watcherStop,
+        applyExternalFacts: vi.fn(),
+      })),
+    }));
+    vi.doMock('../src/sources/docker-poller.js', () => ({
+      DockerPoller: vi.fn().mockImplementation(() => ({ start: dockerStart, stop: dockerStop })),
+    }));
+    vi.doMock('../src/sources/docker-client.js', () => ({
+      CliDockerClient: vi.fn(),
+    }));
+    vi.doMock('../src/arsenal/arsenal-poller.js', () => ({
+      ArsenalPoller: vi.fn().mockImplementation(() => ({
+        start: vi.fn(),
+        stop: vi.fn(),
+      })),
+    }));
+
+    process.env.AOA_SOURCES = 'claude';
+    try {
+      const { startServer: startServerWithMock } = await import('../src/server.js');
+      localRunning = await startServerWithMock({ port: 0, demo: false });
+      await localRunning.close();
+      localRunning = undefined;
+
+      expect(dockerStart).toHaveBeenCalledTimes(1);
+      expect(dockerStop).toHaveBeenCalledTimes(1);
+    } finally {
+      await localRunning?.close();
+      if (prev === undefined) delete process.env.AOA_SOURCES;
+      else process.env.AOA_SOURCES = prev;
+      vi.doUnmock('../src/watcher.js');
+      vi.doUnmock('../src/sources/docker-poller.js');
+      vi.doUnmock('../src/sources/docker-client.js');
+      vi.doUnmock('../src/arsenal/arsenal-poller.js');
+      vi.resetModules();
+    }
+  });
+
+  it('does not start Docker poller when Claude source is disabled', async () => {
+    const prev = process.env.AOA_SOURCES;
+    const DockerPoller = vi.fn().mockImplementation(() => ({
+      start: vi.fn().mockResolvedValue(undefined),
+      stop: vi.fn(),
+    }));
+    let localRunning: RunningServer | undefined;
+
+    vi.resetModules();
+    vi.doMock('../src/watcher.js', () => ({
+      SourceWatcher: vi.fn().mockImplementation((_world, source) => ({
+        id: source.id,
+        start: vi.fn(),
+        stop: vi.fn().mockResolvedValue(undefined),
+        applyExternalFacts: vi.fn(),
+      })),
+    }));
+    vi.doMock('../src/sources/docker-poller.js', () => ({ DockerPoller }));
+    vi.doMock('../src/sources/docker-client.js', () => ({
+      CliDockerClient: vi.fn(),
+    }));
+    vi.doMock('../src/arsenal/arsenal-poller.js', () => ({
+      ArsenalPoller: vi.fn().mockImplementation(() => ({
+        start: vi.fn(),
+        stop: vi.fn(),
+      })),
+    }));
+
+    process.env.AOA_SOURCES = 'codex';
+    try {
+      const { startServer: startServerWithMock } = await import('../src/server.js');
+      localRunning = await startServerWithMock({ port: 0, demo: false });
+      await localRunning.close();
+      localRunning = undefined;
+
+      expect(DockerPoller).not.toHaveBeenCalled();
+    } finally {
+      await localRunning?.close();
+      if (prev === undefined) delete process.env.AOA_SOURCES;
+      else process.env.AOA_SOURCES = prev;
+      vi.doUnmock('../src/watcher.js');
+      vi.doUnmock('../src/sources/docker-poller.js');
+      vi.doUnmock('../src/sources/docker-client.js');
+      vi.doUnmock('../src/arsenal/arsenal-poller.js');
+      vi.resetModules();
+    }
+  });
+
   it('stops real-mode watchers and arsenal poller on close', async () => {
     const prev = process.env.AOA_SOURCES;
     const watcherStart = vi.fn();

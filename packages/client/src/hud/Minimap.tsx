@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { getGameView } from '../game/view';
+import { flipAxis } from '../game/flip';
 import { TEAM_COLORS } from '../game/placeholders';
 import { getTheme } from '../theme';
 import { useSettings } from '../settings';
@@ -27,6 +28,17 @@ export function Minimap() {
       ctx.fillRect(0, 0, W, H);
       ctx.globalAlpha = 1;
 
+      // Przy odbiciu miasta lustrzymy też minimapę — tym samym mechanizmem co
+      // widok główny (worldLayer.scale.x=-1), tu przez macierz kontekstu 2D, żeby
+      // lewo/prawo zgadzało się z planszą. Transform obejmuje tylko rysowanie;
+      // współrzędne kliknięcia odwracamy osobno (flipAxis) w onClick.
+      const flipped = useSettings.getState().flipped;
+      ctx.save();
+      if (flipped) {
+        ctx.translate(W, 0);
+        ctx.scale(-1, 1);
+      }
+
       for (const b of theme.buildings) {
         ctx.fillStyle = `#${b.placeholderColor.toString(16).padStart(6, '0')}`;
         ctx.fillRect(b.gx * sx, b.gy * sy, Math.max(3, b.w * sx), Math.max(3, b.h * sy));
@@ -46,6 +58,7 @@ export function Minimap() {
           ctx.stroke();
         }
       }
+      ctx.restore();
     }, 200);
     return () => clearInterval(timer);
   }, [themeId]);
@@ -59,7 +72,10 @@ export function Minimap() {
         onClick={(e) => {
           const grid = getTheme(useSettings.getState().themeId).grid;
           const rect = e.currentTarget.getBoundingClientRect();
-          const gx = ((e.clientX - rect.left) / W) * grid.w;
+          // Gdy minimapa odbita, jej oś X jest zlustrowana względem świata — odwróć
+          // gx z powrotem (flipAxis to inwolucja, więc trafia w tę samą jednostkę).
+          const flipped = useSettings.getState().flipped;
+          const gx = flipAxis(((e.clientX - rect.left) / W) * grid.w, grid.w, flipped);
           const gy = ((e.clientY - rect.top) / H) * grid.h;
           getGameView()?.centerOn(gx, gy);
         }}

@@ -5,6 +5,8 @@ import { World } from './world.js';
 import { registerMappingRoutes } from './mapping-routes.js';
 import { registerModelRoutes } from './model-routes.js';
 import { OpenCodePoller } from './sources/opencode-poller.js';
+import { DockerPoller } from './sources/docker-poller.js';
+import { CliDockerClient } from './sources/docker-client.js';
 import { ArsenalPoller } from './arsenal/arsenal-poller.js';
 import type { SourceWatcher } from './watcher.js';
 
@@ -30,6 +32,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   const world = new World();
   let watchers: SourceWatcher[] = [];
   let opencodePoller: OpenCodePoller | undefined;
+  let dockerPoller: DockerPoller | undefined;
   let arsenalPoller: ArsenalPoller | undefined;
 
   app.get('/health', async () => ({ ok: true, demo: opts.demo }));
@@ -55,6 +58,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     // OpenCode uses SQLite instead of JSONL: start poller.
     const opencodeEnabled = sources.some((source) => source.id === 'opencode');
     opencodePoller = opencodeEnabled ? new OpenCodePoller(world) : undefined;
+    // Containerized Claude sessions are controlled by the Claude source filter.
+    const dockerEnabled = sources.some((source) => source.id === 'claude');
+    dockerPoller = dockerEnabled ? new DockerPoller(world, new CliDockerClient()) : undefined;
 
     app.get('/building-stats', async () => getBuildingStats());
     // Tool->building map: local server = source of truth (file on user's disk);
@@ -65,7 +71,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
       const translated = translateHook((request.body ?? {}) as never);
       if (translated) {
         if (!claudeWatcher) return reply.code(409).send({ ok: false, error: 'claude source disabled' });
-        claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts);
+        claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts, translated.cwd);
       }
       return { ok: true };
     });
@@ -82,6 +88,8 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     app.addHook('onReady', async () => {
       for (const w of watchers) w.start();
       await opencodePoller?.start();
+      // Fire-and-forget: Docker unavailability must not delay server readiness.
+      void dockerPoller?.start();
       // `arsenal-updated` event to client (Arsenal panel).
       arsenalPoller = new ArsenalPoller(world);
       arsenalPoller.start();
@@ -138,6 +146,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     close: async () => {
       offEvent();
       await opencodePoller?.stop();
+      dockerPoller?.stop();
       await Promise.all(watchers.map((w) => w.stop()));
       arsenalPoller?.stop();
       await new Promise<void>((resolve, reject) =>

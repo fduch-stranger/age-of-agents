@@ -1,5 +1,6 @@
 import type { ProjectArsenal, WieldedArsenal } from './arsenal.js';
 export * from './arsenal.js';
+export * from './providers.js';
 
 /** Agent Citadel WebSocket protocol: shared server/client types. */
 
@@ -52,10 +53,17 @@ export interface HeroSnapshot {
   /** Current context size from the LAST message (input + cache_read + cache_creation).
    *  Not the same as tokens.input (the cumulative total). Missing means hide the context bar. */
   contextTokens?: number;
+  /** Context window size reported by the CLI. Missing means the client falls back to model config. */
+  contextWindowTokens?: number;
   /** What this session actually drew from the arsenal, based on transcript attribution. */
   wielded?: WieldedArsenal;
+  /** Tożsamość kontenera Docker, jeśli sesja działa w kontenerze (źródło Docker).
+   *  Brak → sesja hostowa. Steruje odznaką kontenera w panelu. */
+  container?: { id: string; name: string; image: string };
   startedAt: string;
   lastActivityAt: string;
+  /** Bumped when a session is cleared so the client can play one cosmetic strike. */
+  clearedAt?: number;
 }
 
 export interface PeonSnapshot {
@@ -82,6 +90,9 @@ export interface WorldSnapshot {
   peons: PeonSnapshot[];
   missions: MissionSnapshot[];
   transcripts: TranscriptLine[];
+  /** Statyczny ekwipunek per projekt — w snapshocie, by nowy klient dostał go
+   * od razu (arsenal-updated leci tylko przy zmianie). */
+  arsenals: ProjectArsenal[];
 }
 
 /** Transcript line for the side panel: a summary, not the full content. */

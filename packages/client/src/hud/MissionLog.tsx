@@ -1,5 +1,6 @@
 import type { HeroSnapshot } from '@agent-citadel/shared';
 import { useWorld } from '../store';
+import { useSettings } from '../settings';
 import { useUi } from '../i18n';
 import { clip } from '../util';
 
@@ -18,6 +19,8 @@ export function MissionLog() {
   const heroes = useWorld((s) => s.heroes);
   const selected = useWorld((s) => s.selectedSessionId);
   const selectedBuilding = useWorld((s) => s.selectedBuildingId);
+  const collapsed = useSettings((s) => s.missionsCollapsed);
+  const setCollapsed = useSettings((s) => s.setMissionsCollapsed);
   const t = useUi();
   if (selected || selectedBuilding) return null; // side/building panel owns the right side
 
@@ -27,9 +30,19 @@ export function MissionLog() {
   if (active.length + done.length === 0) return null;
 
   return (
-    <div className="hud-panel missions">
-      <h3 className="px" style={{ color: '#fac775', opacity: 0.9 }}>{t.missions}</h3>
-      {[...active, ...done].map((mission) => (
+    <div className={`hud-panel missions${collapsed ? ' collapsed' : ''}`}>
+      <button
+        type="button"
+        className="missions-head px"
+        aria-expanded={!collapsed}
+        title={t.missions}
+        onClick={() => setCollapsed(!collapsed)}
+      >
+        <span className="chevron" aria-hidden>{collapsed ? '▸' : '▾'}</span>
+        <span style={{ flex: 1, textAlign: 'left' }}>{t.missions}</span>
+        {collapsed && active.length > 0 && <span className="count">⚔️ {active.length}</span>}
+      </button>
+      {!collapsed && [...active, ...done].map((mission) => (
         <div key={mission.id} className="mission">
           <div>
             {mission.status === 'active' ? '⚔️' : mission.status === 'completed' ? '✅' : '💀'}{' '}

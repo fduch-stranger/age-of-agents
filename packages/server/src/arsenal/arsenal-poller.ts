@@ -86,6 +86,8 @@ export class ArsenalPoller {
       return;
     }
     this.cache.set(projectDir, { fingerprint: fp, lastSeenMs: Date.now() });
-    this.world.emitCustom({ type: 'arsenal-updated', arsenal });
+    // Zapis w stanie świata (a nie ulotny emit) — nowy klient dostaje arsenał
+    // w snapshocie, nawet jeśli podłączył się po tym skanie.
+    this.world.setArsenal(arsenal);
   }
 }

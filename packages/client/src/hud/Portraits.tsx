@@ -2,6 +2,7 @@ import { getGameView } from '../game/view';
 import { teamColorHex } from '../game/placeholders';
 import { useWorld } from '../store';
 import { useUi } from '../i18n';
+import { ProviderEmblem } from './ProviderEmblem';
 
 export function Portraits() {
   const heroes = useWorld((s) => s.heroes);
@@ -36,6 +37,9 @@ export function Portraits() {
               getGameView()?.focusOnUnit(hero.sessionId);
             }}
           >
+            <span className="emblem-badge">
+              <ProviderEmblem agent={hero.agent} variant="chip" />
+            </span>
             <div className="face" style={{ background: cssColor }}>
               {hero.title.slice(0, 1).toUpperCase()}
             </div>

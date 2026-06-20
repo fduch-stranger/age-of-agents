@@ -18,29 +18,29 @@ Rejestr buduje się na maina, który zawiera już `HeroSnapshot.contextTokens` i
 
 **Files:** brak edycji plików — operacje git.
 
-- [ ] **Step 1: Upewnij się, że jesteś na main z czystym drzewem dla plików gałęzi**
+- [x] **Step 1: Upewnij się, że jesteś na main z czystym drzewem dla plików gałęzi**
 
 Run: `git -C "/Users/mpawelczuk/RTS agents" checkout main && git status`
 Expected: na `main`; ewentualne lokalne zmiany dotyczą tylko `.claude/launch.json` / `docs/index.html` (gałąź ich nie rusza).
 
-- [ ] **Step 2: Potwierdź brak konfliktów (merge-tree)**
+- [x] **Step 2: Potwierdź brak konfliktów (merge-tree)**
 
 Run: `git merge-tree $(git merge-base main feat/context-bar-and-scroll) main feat/context-bar-and-scroll | grep -iE "CONFLICT|changed in both" || echo "NO CONFLICTS"`
 Expected: `NO CONFLICTS`.
 
-- [ ] **Step 3: Scal gałąź (merge commit, BEZ publikacji)**
+- [x] **Step 3: Scal gałąź (merge commit, BEZ publikacji)**
 
 ```bash
 git merge --no-ff feat/context-bar-and-scroll -m "merge: pasek kontekstu + scroll → main (przed rejestrem modeli)"
 ```
 Expected: merge zakończony; pojawiają się `packages/client/src/hud/ContextBar.tsx`, `context-bar.ts`, `HeroSnapshot.contextTokens`. Wersja w `package.json` = `0.3.5`. NIE tworzymy taga `v*` (publish.yml odpala tylko tag).
 
-- [ ] **Step 4: Sanity — build + testy przechodzą po merge**
+- [x] **Step 4: Sanity — build + testy przechodzą po merge**
 
 Run: `npm run build && npm test`
-Expected: build OK; wszystkie testy zielone (w tym `context-bar.test.ts`).
+Expected: build OK; wszystkie testy zielone (w tym `context-bar.test.ts`). ZROBIONE: 134 testy zielone, build OK, main @ 989fef0 (v0.3.5).
 
-- [ ] **Step 5: (commit już jest z merge — nic do dodania)**
+- [x] **Step 5: (commit już jest z merge — nic do dodania)**
 
 ---
 

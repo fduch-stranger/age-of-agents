@@ -8,6 +8,7 @@ import { WaypointGraph } from './pathfind';
 import { buildBuilding, drawRoads, drawTerrain, TEAM_COLORS } from './placeholders';
 import { Unit } from './unit';
 import { getHeroSheet, getPeonSheet, loadThemeSprites } from './sprites';
+import { loadEmblems } from './emblems';
 import { sessionToArchetypeKey } from './archetype';
 import { resolveModelLive } from '../model-store';
 import { loadTilemaps, hasTilemaps, buildTilemap } from './tilemap';
@@ -20,7 +21,9 @@ import { buildTerrainMap } from './terrain-map';
 import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './building-fx';
 import { buildingText } from '../i18n';
 import { homeBuilding, awaitingBuilding } from './home-building';
+import { worldLayerTransform, worldToViewport, flipTextNodes } from './flip';
 import type { Lang } from '../settings';
+import { contextPct } from '../context-progress';
 
 /** Target decoration width in tiles (for sprite scaling). */
 const DECO_W: Record<DecoKind, number> = { tree: 1.1, rock: 0.8, bush: 0.75, flower: 0.7 };
@@ -92,12 +95,13 @@ export class GameView {
   private targets = new Map<string, string>();
   private lastBuilding = new Map<string, BuildingId>(); // last workshop: the unit "lives" here, not in Citadel
   private wanderAt = new Map<string, number>(); // elapsed time of next small idle-hero walk
-  private worldOffset = { x: 0, y: 0 };
+  private worldLayer!: Container;
   private worldWidth = 0;
   private worldHeight = 0;
   private userZoomed = false; // wheel/pinch/controls: pauses auto-fit on resize
   private particles: Particle[] = [];
   private emitters = new Map<BuildingId, FxEmitter>();
+  private lastClearedAt = new Map<string, number>();
   private elapsed = 0;
   private missionStatus = new Map<string, string>();
   private graph: WaypointGraph;
@@ -109,6 +113,7 @@ export class GameView {
   constructor(
     private readonly theme: ThemeDef,
     private readonly lang: Lang = 'en',
+    private readonly flipped = false,
   ) {
     this.graph = new WaypointGraph(theme);
   }
@@ -198,9 +203,10 @@ export class GameView {
     refit();
 
     // World layer shifted so negative coordinates (iso) fit in the viewport.
-    const worldLayer = new Container();
-    worldLayer.position.set(-minX, -minY);
-    this.worldOffset = { x: -minX, y: -minY };
+    const worldLayer = (this.worldLayer = new Container());
+    const layout = worldLayerTransform(minX, maxX, minY, this.flipped);
+    worldLayer.scale.set(layout.scaleX, layout.scaleY);
+    worldLayer.position.set(layout.x, layout.y);
     this.viewport.addChild(worldLayer);
 
     // PixelLab assets/tilesets MUST be loaded BEFORE building terrain/buildings/decorations.
@@ -208,6 +214,7 @@ export class GameView {
     // and on theme change the scene builds from the old cache before it is cleared.
     await Promise.all([
       loadThemeSprites(this.theme.id),
+      loadEmblems(), // herby providerów — theme-agnostic, idempotentne
       loadBuildingSprites(this.theme.id),
       loadDecorationSprites(this.theme.id),
       this.theme.style === 'topdown' ? loadTilemaps(this.theme.id) : loadIsoTiles(this.theme.id),
@@ -229,6 +236,7 @@ export class GameView {
     for (const def of this.theme.buildings) {
       const label = buildingText(this.theme.id, def.id, this.lang).label;
       const node = buildBuilding(def, this.theme, projection, label);
+      if (this.flipped) flipTextNodes(node);
       node.eventMode = 'static';
       node.cursor = 'pointer';
       node.on('pointertap', () => useWorld.getState().selectBuilding(def.id));
@@ -304,7 +312,7 @@ export class GameView {
   centerOn(gx: number, gy: number): void {
     const { x, y } = this.theme.projection.toScreen(gx, gy);
     this.viewport.animate({
-      position: { x: x + this.worldOffset.x, y: y + this.worldOffset.y },
+      position: this.worldToViewport(x, y),
       time: 350,
       ease: 'easeInOutSine',
     });
@@ -332,7 +340,7 @@ export class GameView {
     }
     const { x, y } = this.theme.projection.toScreen(unit.gx, unit.gy);
     this.viewport.animate({
-      position: { x: x + this.worldOffset.x, y: y + this.worldOffset.y },
+      position: this.worldToViewport(x, y),
       scale: target,
       time: 350,
       ease: 'easeInOutSine',
@@ -344,7 +352,21 @@ export class GameView {
     const unit = this.units.get(id);
     if (!unit) return;
     const { x, y } = this.theme.projection.toScreen(unit.gx, unit.gy);
-    this.viewport.moveCenter(x + this.worldOffset.x, y + this.worldOffset.y);
+    const p = this.worldToViewport(x, y);
+    this.viewport.moveCenter(p.x, p.y);
+  }
+
+  private worldToViewport(sx: number, sy: number): { x: number; y: number } {
+    return worldToViewport(
+      {
+        x: this.worldLayer.position.x,
+        y: this.worldLayer.position.y,
+        scaleX: this.worldLayer.scale.x,
+        scaleY: this.worldLayer.scale.y,
+      },
+      sx,
+      sy,
+    );
   }
 
   /** Zoom multiplier (HUD +/- controls). Kept within clampZoom (cover ... MAX_ZOOM). */
@@ -446,11 +468,20 @@ export class GameView {
         // Remember the "home" building; otherwise idle/thinking heroes return to
         // Citadel (fallback in steer/wanderIdle) and stand in the plaza. With a
         // remembered home they return to the correct gathering point.
+        if (this.flipped) flipTextNodes(unit.container);
         this.lastBuilding.set(hero.sessionId, homeId);
+        this.lastClearedAt.set(hero.sessionId, hero.clearedAt ?? 0);
       }
       unit.setName(clipName(hero.title));
       unit.setState(hero.state, hero.state === 'working' ? hero.toolDetail ?? hero.currentTool : undefined);
+      const contextWindow = hero.contextWindowTokens ?? resolveModelLive(hero.model).contextWindow;
+      unit.setContextProgress(typeof hero.contextTokens === 'number' ? contextPct(hero.contextTokens, contextWindow) : undefined);
       this.steer(unit, hero.state, hero.currentTool, hero.toolDetail, hero.teamColor);
+      const cleared = hero.clearedAt ?? 0;
+      if (cleared !== (this.lastClearedAt.get(hero.sessionId) ?? 0)) {
+        this.lastClearedAt.set(hero.sessionId, cleared);
+        this.smiteOnClear(unit);
+      }
     }
 
     for (const peon of peonList) {
@@ -470,6 +501,7 @@ export class GameView {
         unit.container.on('pointertap', () => useWorld.getState().select(parentId));
         this.units.set(peon.agentId, unit);
         this.unitLayer.addChild(unit.container);
+        if (this.flipped) flipTextNodes(unit.container);
       }
       unit.setState(peon.state, peon.currentTool);
       this.steer(unit, peon.state, peon.currentTool, undefined, 0);
@@ -479,6 +511,7 @@ export class GameView {
       if (!seen.has(id)) {
         this.units.delete(id);
         this.targets.delete(id);
+        this.lastClearedAt.delete(id);
         if (unit.isPeon) {
           this.retirePeon(unit);
         } else {
@@ -530,6 +563,65 @@ export class GameView {
         g,
         vx: Math.cos(angle) * speed,
         vy: Math.sin(angle) * speed - 80,
+        life,
+        maxLife: life,
+        gravity: 220,
+      });
+    }
+  }
+
+  private smiteOnClear(unit: Unit): void {
+    window.setTimeout(() => {
+      if (this.units.get(unit.id) !== unit) return;
+      this.spawnLightning(unit.gx, unit.gy);
+    }, 120);
+  }
+
+  private spawnLightning(gx: number, gy: number): void {
+    const { x, y } = this.theme.projection.toScreen(gx, gy);
+    const pts: number[] = [0, -220];
+    let py = -220;
+    while (py < -14) {
+      py = Math.min(-14, py + 22 + Math.random() * 16);
+      pts.push((Math.random() - 0.5) * 18, py);
+    }
+
+    const bolt = new Graphics();
+    bolt.poly(pts, false).stroke({ color: 0x85c8ff, width: 7, alpha: 0.38 });
+    bolt.poly(pts, false).stroke({ color: 0xfff4bd, width: 2.5, alpha: 0.96 });
+    bolt.blendMode = 'add';
+    bolt.position.set(x, y);
+    this.fxLayer.addChild(bolt);
+    this.particles.push({ g: bolt, vx: 0, vy: 0, life: 0.24, maxLife: 0.24, gravity: 0 });
+
+    const flash = new Graphics();
+    flash.circle(0, -12, 22).fill({ color: 0xd8efff, alpha: 0.42 });
+    flash.circle(0, -12, 9).fill({ color: 0xfff4bd, alpha: 0.78 });
+    flash.blendMode = 'add';
+    flash.position.set(x, y);
+    this.fxLayer.addChild(flash);
+    this.particles.push({ g: flash, vx: 0, vy: 0, life: 0.32, maxLife: 0.32, gravity: 0 });
+
+    const ring = new Graphics();
+    ring.ellipse(0, 2, 18, 7).stroke({ color: 0xfff4bd, width: 2.5, alpha: 0.9 });
+    ring.blendMode = 'add';
+    ring.position.set(x, y);
+    this.fxLayer.addChild(ring);
+    this.particles.push({ g: ring, vx: 0, vy: 0, life: 0.45, maxLife: 0.45, gravity: 0 });
+
+    for (let i = 0; i < 14; i++) {
+      const spark = new Graphics();
+      spark.rect(-2, -2, 4, 4).fill(i % 3 === 0 ? 0xfff4bd : 0x85c8ff);
+      spark.blendMode = 'add';
+      spark.position.set(x, y - 14);
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 60 + Math.random() * 130;
+      const life = 0.55 + Math.random() * 0.4;
+      this.fxLayer.addChild(spark);
+      this.particles.push({
+        g: spark,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 70,
         life,
         maxLife: life,
         gravity: 220,

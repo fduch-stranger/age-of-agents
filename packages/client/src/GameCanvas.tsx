@@ -7,6 +7,7 @@ import { useSettings } from './settings';
 export function GameCanvas() {
   const themeId = useSettings((s) => s.themeId);
   const lang = useSettings((s) => s.lang);
+  const flipped = useSettings((s) => s.flipped);
   const hostRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -20,7 +21,7 @@ export function GameCanvas() {
     // 1 px width (for example, hidden tab) would break camera fitting.
     const tryInit = () => {
       if (view || host.clientWidth < 50 || host.clientHeight < 50) return;
-      view = new GameView(getTheme(themeId), lang);
+      view = new GameView(getTheme(themeId), lang, flipped);
       view.init(host).catch(console.error);
       observer?.disconnect();
     };
@@ -33,8 +34,8 @@ export function GameCanvas() {
       uninstallGuards();
       view?.destroy();
     };
-    // Changing theme OR language rebuilds the scene (building labels from i18n).
-  }, [themeId, lang]);
+    // Changing theme, language, or map direction rebuilds the scene.
+  }, [themeId, lang, flipped]);
 
   return <div ref={hostRef} style={{ position: 'absolute', inset: 0 }} />;
 }

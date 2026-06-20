@@ -9,6 +9,13 @@ import { World } from '../src/world.js';
 import type { AgentSource } from '../src/sources/types.js';
 import type { Fact } from '../src/transcript/facts.js';
 
+const stubSource: AgentSource = {
+  id: 'claude',
+  roots: () => [],
+  classify: () => ({ kind: 'other' }),
+  parseLine: () => [],
+};
+
 const chokidarWatchSpy = vi.hoisted(() => vi.fn<typeof import('chokidar').watch>());
 
 vi.mock('chokidar', async (importOriginal) => {
@@ -61,7 +68,7 @@ describe('SourceWatcher - subagents from source metadata', () => {
       expect(() => watcher.start()).not.toThrow();
       await watcher.stop();
       expect(chokidarWatchSpy).not.toHaveBeenCalled();
-      expect(world.snapshot()).toEqual({ heroes: [], peons: [], missions: [], transcripts: [] });
+      expect(world.snapshot()).toEqual({ heroes: [], peons: [], missions: [], transcripts: [], arsenals: [] });
     } finally {
       chokidarWatchSpy.mockClear();
     }
@@ -213,5 +220,39 @@ describe('SourceWatcher - root refresh', () => {
     expect(fakeWatcher.add).toHaveBeenCalledWith([dir2]);
     expect(internals.rootFor(join(dir1, 'rollout-old-session.jsonl'))).toBe(dir1);
     expect(internals.rootFor(join(dir2, 'rollout-new-session.jsonl'))).toBe(dir2);
+  });
+});
+
+describe('applyExternalFacts - /clear strike routing', () => {
+  it('routes cleared to the existing hero in the same cwd, not the new session', () => {
+    const world = new World();
+    const watcher = new SourceWatcher(world, stubSource);
+    const cwd = '/home/lachlan/age-of-agents';
+
+    watcher.applyExternalFacts('old-session', 'age-of-agents', [{ kind: 'meta', cwd }]);
+    watcher.applyExternalFacts(
+      'new-session',
+      'age-of-agents',
+      [
+        { kind: 'meta', cwd },
+        { kind: 'cleared', ts: new Date().toISOString() },
+      ],
+      cwd,
+    );
+
+    expect(world.getHero('old-session')?.clearedAt).toBeTypeOf('number');
+    expect(world.getHero('new-session')?.clearedAt).toBeUndefined();
+  });
+
+  it('routes cleared to the new session when no matching cwd is provided', () => {
+    const world = new World();
+    const watcher = new SourceWatcher(world, stubSource);
+
+    watcher.applyExternalFacts('solo-session', 'age-of-agents', [
+      { kind: 'meta', cwd: '/home/lachlan/age-of-agents' },
+      { kind: 'cleared', ts: new Date().toISOString() },
+    ]);
+
+    expect(world.getHero('solo-session')?.clearedAt).toBeTypeOf('number');
   });
 });

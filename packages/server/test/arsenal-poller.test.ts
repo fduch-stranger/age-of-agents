@@ -40,4 +40,24 @@ describe('ArsenalPoller.refreshOnce', () => {
     }
     await fs.rm(wd, { recursive: true, force: true });
   });
+
+  it('zapisuje arsenał w stanie świata (snapshot dla nowego klienta podłączonego po skanie)', async () => {
+    const wd = await fs.mkdtemp(path.join(os.tmpdir(), 'ars-snap-'));
+    await fs.mkdir(path.join(wd, '.claude'), { recursive: true });
+    await fs.writeFile(path.join(wd, '.claude', 'settings.json'), JSON.stringify({
+      hooks: { SessionStart: [{ hooks: [{ command: 'bd prime' }] }] },
+    }));
+
+    const world = new World();
+    world.upsertHero(hero({ sessionId: 's1', projectDir: 'PD', workingDir: wd, projectName: 'proj' }));
+
+    const poller = new ArsenalPoller(world, os.tmpdir());
+    await poller.refreshOnce();
+
+    // Klient, który podłączy się TERAZ (po skanie), dostaje arsenał ze snapshotu.
+    const arsenals = world.snapshot().arsenals;
+    expect(arsenals.map((a) => a.projectDir)).toContain('PD');
+
+    await fs.rm(wd, { recursive: true, force: true });
+  });
 });
