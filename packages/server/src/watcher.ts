@@ -61,6 +61,10 @@ export class SourceWatcher {
 
   start(): void {
     this.refreshRoots();
+    if (this.roots.length === 0) {
+      console.error('[watcher]', this.source.id, 'no roots configured; source disabled');
+      return;
+    }
     this.watcher = watch(this.roots, {
       depth: this.source.depth ?? 6,
       ignoreInitial: false,

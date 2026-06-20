@@ -9,6 +9,14 @@ import { World } from '../src/world.js';
 import type { AgentSource } from '../src/sources/types.js';
 import type { Fact } from '../src/transcript/facts.js';
 
+const chokidarWatchSpy = vi.hoisted(() => vi.fn<typeof import('chokidar').watch>());
+
+vi.mock('chokidar', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('chokidar')>();
+  chokidarWatchSpy.mockImplementation(actual.watch);
+  return { ...actual, watch: chokidarWatchSpy };
+});
+
 async function waitFor(check: () => boolean): Promise<void> {
   const deadline = Date.now() + 2000;
   while (Date.now() < deadline) {
@@ -38,6 +46,27 @@ describe('isLiveAtStartup — okno wykrywania sesji przy starcie', () => {
 });
 
 describe('SourceWatcher — subagenci z metadanych źródła', () => {
+  it('does not create a chokidar watcher when a source has no roots', async () => {
+    chokidarWatchSpy.mockClear();
+    const world = new World();
+    const source: AgentSource = {
+      id: 'koda',
+      roots: () => [],
+      classify: () => ({ kind: 'other' }),
+      parseLine: () => [],
+    };
+    const watcher = new SourceWatcher(world, source, DEFAULT_THRESHOLDS);
+
+    try {
+      expect(() => watcher.start()).not.toThrow();
+      await watcher.stop();
+      expect(chokidarWatchSpy).not.toHaveBeenCalled();
+      expect(world.snapshot()).toEqual({ heroes: [], peons: [], missions: [] });
+    } finally {
+      chokidarWatchSpy.mockClear();
+    }
+  });
+
   it('plik sklasyfikowany jako sesja może zostać przekierowany do peona po subagent-meta', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'aoa-watcher-'));
     const world = new World();
