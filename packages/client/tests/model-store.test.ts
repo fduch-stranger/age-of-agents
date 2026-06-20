@@ -64,8 +64,19 @@ describe('useModels store', () => {
   it('hydrate loads config from GET', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(CUSTOM)))));
     await useModels.getState().hydrate();
-    expect(useModels.getState().models).toEqual(CUSTOM);
+    expect(useModels.getState().models.sprites[0]).toEqual(CUSTOM.sprites[0]);
+    expect(useModels.getState().models.windows[0]).toEqual(CUSTOM.windows[0]);
+    expect(useModels.getState().models.fallback).toEqual(CUSTOM.fallback);
     expect(useModels.getState().modelsLoaded).toBe(true);
+  });
+  it('hydrate upgrades older saved configs with built-in Codex presets', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify(CUSTOM)))));
+    await useModels.getState().hydrate();
+    expect(resolveModelLive('gpt-5.5')).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5.5',
+      contextWindow: 258_400,
+    });
   });
   it('hydrate ignores invalid config from server', async () => {
     vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(JSON.stringify({ sprites: [], windows: [], fallback: { sprite: 'nope', contextWindow: 1 } })))));

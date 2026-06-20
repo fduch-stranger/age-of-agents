@@ -431,6 +431,36 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
   fallback: { sprite: 'sonnet', contextWindow: 200_000 }, // unknown models: conservative 200k
 };
 
+function sameModelMatch(a: ModelMatch, b: ModelMatch): boolean {
+  if (a.kind !== b.kind) return false;
+  if (a.kind === 'exact' && b.kind === 'exact') return a.id === b.id;
+  if (a.kind === 'pattern' && b.kind === 'pattern') return a.pattern === b.pattern;
+  return false;
+}
+
+/**
+ * Keeps user-saved registries forward-compatible with new built-in presets.
+ * Existing user rules stay first and continue to win; missing default rules are
+ * appended so older saved configs recognize newly supported models.
+ */
+export function upgradeModelConfig(config: ModelConfig): ModelConfig {
+  const sprites = [...config.sprites];
+  for (const rule of DEFAULT_MODEL_CONFIG.sprites) {
+    if (!sprites.some((existing) => sameModelMatch(existing.match, rule.match))) {
+      sprites.push(rule);
+    }
+  }
+
+  const windows = [...config.windows];
+  for (const rule of DEFAULT_MODEL_CONFIG.windows) {
+    if (!windows.some((existing) => sameModelMatch(existing.match, rule.match))) {
+      windows.push(rule);
+    }
+  }
+
+  return { sprites, windows, fallback: config.fallback };
+}
+
 /** Validates a raw object as ModelConfig. Builds a clean config without extra fields. */
 export function validateModelConfig(
   input: unknown,

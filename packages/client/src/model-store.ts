@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import {
   resolveModel,
   DEFAULT_MODEL_CONFIG,
+  upgradeModelConfig,
   validateModelConfig,
   type ModelConfig,
   type ResolvedModel,
@@ -20,7 +21,7 @@ function readCache(): ModelConfig {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return DEFAULT_MODEL_CONFIG;
     const res = validateModelConfig(JSON.parse(raw));
-    return res.ok ? res.config : DEFAULT_MODEL_CONFIG;
+    return res.ok ? upgradeModelConfig(res.config) : DEFAULT_MODEL_CONFIG;
   } catch {
     return DEFAULT_MODEL_CONFIG;
   }
@@ -84,8 +85,9 @@ export const useModels = create<ModelStore>((set, get) => ({
         const parsed: unknown = await res.json();
         const v = validateModelConfig(parsed);
         if (v.ok) {
-          set({ models: v.config });
-          writeCache(v.config);
+          const upgraded = upgradeModelConfig(v.config);
+          set({ models: upgraded });
+          writeCache(upgraded);
         }
       }
     } catch {

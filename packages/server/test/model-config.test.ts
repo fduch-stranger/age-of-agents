@@ -24,7 +24,21 @@ describe('loadModelConfig', () => {
   it('valid file -> loaded config', async () => {
     const p = tmpPath();
     writeFileSync(p, JSON.stringify(CUSTOM));
-    expect(await loadModelConfig(p)).toEqual(CUSTOM);
+    const loaded = await loadModelConfig(p);
+    expect(loaded.sprites[0]).toEqual(CUSTOM.sprites[0]);
+    expect(loaded.windows[0]).toEqual(CUSTOM.windows[0]);
+    expect(loaded.fallback).toEqual(CUSTOM.fallback);
+  });
+  it('valid old file is upgraded with missing built-in presets', async () => {
+    const p = tmpPath();
+    writeFileSync(p, JSON.stringify(CUSTOM));
+    const loaded = await loadModelConfig(p);
+    expect(loaded.sprites).toEqual(expect.arrayContaining([
+      expect.objectContaining({ match: { kind: 'exact', id: 'gpt-5.5' }, displayName: 'GPT-5.5' }),
+    ]));
+    expect(loaded.windows).toEqual(expect.arrayContaining([
+      expect.objectContaining({ match: { kind: 'exact', id: 'gpt-5.5' }, contextWindow: 258_400 }),
+    ]));
   });
   it('broken JSON -> DEFAULT', async () => {
     const p = tmpPath();
@@ -42,10 +56,12 @@ describe('saveModelConfig', () => {
   it('creates directory, saves, load returns new config', async () => {
     const p = join(mkdtempSync(join(tmpdir(), 'aoa-model-')), 'nested', 'model-config.json');
     const saved = await saveModelConfig(CUSTOM, p);
-    expect(saved).toEqual(CUSTOM);
+    expect(saved).toMatchObject(CUSTOM);
     expect(existsSync(p)).toBe(true);
-    expect(JSON.parse(readFileSync(p, 'utf8'))).toEqual(CUSTOM);
-    expect(await loadModelConfig(p)).toEqual(CUSTOM);
+    expect(JSON.parse(readFileSync(p, 'utf8'))).toMatchObject(CUSTOM);
+    const loaded = await loadModelConfig(p);
+    expect(loaded.sprites[0]).toEqual(CUSTOM.sprites[0]);
+    expect(loaded.windows[0]).toEqual(CUSTOM.windows[0]);
   });
   it('rejects invalid config', async () => {
     await expect(saveModelConfig({ sprites: [], windows: [], fallback: { sprite: 'nope', contextWindow: 1 } } as unknown as ModelConfig, tmpPath())).rejects.toThrow();

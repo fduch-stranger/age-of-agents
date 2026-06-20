@@ -10,6 +10,7 @@ export {
   resolveContextWindow,
   resolveModel,
   DEFAULT_MODEL_CONFIG,
+  upgradeModelConfig,
   validateModelConfig,
 } from '@agent-citadel/shared';
 export type {

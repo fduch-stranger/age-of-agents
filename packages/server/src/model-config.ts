@@ -1,7 +1,7 @@
 import { readFile, writeFile, mkdir, rename } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { DEFAULT_MODEL_CONFIG, validateModelConfig, type ModelConfig } from '@agent-citadel/shared';
+import { DEFAULT_MODEL_CONFIG, upgradeModelConfig, validateModelConfig, type ModelConfig } from '@agent-citadel/shared';
 
 /**
  * Persistence for the editable model registry. The local server is the source of
@@ -27,7 +27,7 @@ export async function loadModelConfig(path = defaultModelConfigPath()): Promise<
   try {
     const parsed: unknown = JSON.parse(await readFile(path, 'utf8'));
     const res = validateModelConfig(parsed);
-    if (res.ok) config = res.config;
+    if (res.ok) config = upgradeModelConfig(res.config);
   } catch {
     /* missing file / bad JSON -> DEFAULT */
   }

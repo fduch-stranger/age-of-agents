@@ -5,6 +5,7 @@ import {
   resolveContextWindow,
   validateModelConfig,
   DEFAULT_MODEL_CONFIG,
+  upgradeModelConfig,
   type ModelConfig,
 } from '../src/theme/models';
 
@@ -72,6 +73,37 @@ describe('matching - first hit + case-insensitive', () => {
     };
     expect(resolveSprite('My-Model', cfg).sprite).toBe('haiku');
     expect(resolveContextWindow('xx-my-yy', cfg)).toBe(333);
+  });
+});
+
+describe('upgradeModelConfig', () => {
+  it('adds missing built-in Codex presets to older saved configs', () => {
+    const oldConfig: ModelConfig = {
+      sprites: [
+        { match: { kind: 'pattern', pattern: 'opus' }, sprite: 'opus', displayName: 'Opus 4.8' },
+        { match: { kind: 'pattern', pattern: 'sonnet' }, sprite: 'sonnet', displayName: 'Sonnet 4.6' },
+      ],
+      windows: [
+        { match: { kind: 'pattern', pattern: 'opus' }, contextWindow: 1_000_000 },
+        { match: { kind: 'pattern', pattern: 'sonnet' }, contextWindow: 1_000_000 },
+      ],
+      fallback: { sprite: 'sonnet', contextWindow: 200_000 },
+    };
+
+    const upgraded = upgradeModelConfig(oldConfig);
+    expect(resolveModel('gpt-5.5', upgraded)).toMatchObject({
+      sprite: 'fable',
+      displayName: 'GPT-5.5',
+      contextWindow: 258_400,
+    });
+    expect(upgraded.sprites[0]).toEqual(oldConfig.sprites[0]);
+    expect(upgraded.windows[0]).toEqual(oldConfig.windows[0]);
+  });
+
+  it('does not duplicate existing user rules', () => {
+    const upgraded = upgradeModelConfig(DEFAULT_MODEL_CONFIG);
+    expect(upgraded.sprites).toHaveLength(DEFAULT_MODEL_CONFIG.sprites.length);
+    expect(upgraded.windows).toHaveLength(DEFAULT_MODEL_CONFIG.windows.length);
   });
 });
 
