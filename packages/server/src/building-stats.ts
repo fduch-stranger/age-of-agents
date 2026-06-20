@@ -10,6 +10,7 @@ import {
   type MappingConfig,
 } from '@agent-citadel/shared';
 import { loadMappingConfig } from './mapping-config.js';
+import { codexToolToCanonical } from './sources/codex.js';
 
 /**
  * Token usage per building for day/week/30-day windows.
@@ -40,6 +41,12 @@ export interface MsgSample {
   ts: number; // epoch ms
   output: number; // message output tokens
   tools: { name: string; detail?: string }[];
+}
+
+const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined);
+
+function clip(text: string, max = 240): string {
+  return text.length > max ? `${text.slice(0, max - 1)}...` : text;
 }
 
 /**
@@ -89,6 +96,80 @@ function sampleFromRecord(rec: any): MsgSample | undefined {
   return { ts, output, tools };
 }
 
+function parseCodexArgs(name: string, raw: unknown): any | undefined {
+  if (typeof raw === 'string') {
+    try {
+      return JSON.parse(raw);
+    } catch {
+      if (name === 'apply_patch' || name === 'functions.apply_patch') return { input: raw };
+      return { input: raw };
+    }
+  }
+  return raw && typeof raw === 'object' ? raw : undefined;
+}
+
+function codexToolDetail(name: string, raw: unknown): string | undefined {
+  const args = parseCodexArgs(name, raw);
+  if (!args) return undefined;
+
+  if (
+    name === 'shell' ||
+    name === 'local_shell' ||
+    name === 'exec' ||
+    name === 'exec_command' ||
+    name === 'functions.exec_command'
+  ) {
+    const cmd = Array.isArray(args.command) ? args.command.join(' ') : str(args.command) ?? str(args.cmd);
+    return cmd ? clip(cmd.replace(/^bash\s+-lc\s+/, ''), 60) : undefined;
+  }
+
+  if (name === 'apply_patch' || name === 'functions.apply_patch') {
+    const patch = str(args.input) ?? str(args.patch) ?? '';
+    const match = patch.match(/\*\*\* (?:Update|Add|Delete) File: (.+)/);
+    return match ? match[1].split('/').pop() : undefined;
+  }
+
+  return str(args.path) ?? str(args.file_path) ?? str(args.query);
+}
+
+function codexToolFromRecord(rec: any): { ts: number; name: string; detail?: string } | undefined {
+  if (rec?.type !== 'response_item') return undefined;
+  const ts = Date.parse(rec.timestamp);
+  if (!ts) return undefined;
+  const payload = rec.payload;
+  if (!payload || typeof payload !== 'object') return undefined;
+
+  if (payload.type === 'function_call' || payload.type === 'custom_tool_call') {
+    const rawName = str(payload.name);
+    if (!rawName) return undefined;
+    return {
+      ts,
+      name: codexToolToCanonical(rawName),
+      detail: codexToolDetail(rawName, payload.arguments ?? payload.input),
+    };
+  }
+
+  if (payload.type === 'tool_search_call') {
+    return { ts, name: 'ToolSearch', detail: str(payload.query) };
+  }
+
+  return undefined;
+}
+
+function codexOutputTotalFromRecord(rec: any): { ts: number; outputTotal: number } | undefined {
+  if (rec?.type !== 'event_msg') return undefined;
+  const ts = Date.parse(rec.timestamp);
+  if (!ts) return undefined;
+  const payload = rec.payload;
+  if (!payload || typeof payload !== 'object' || payload.type !== 'token_count') return undefined;
+
+  const info = payload.info ?? payload;
+  const total = info.total_token_usage ?? payload.total_token_usage ?? payload;
+  if (!total || typeof total !== 'object') return undefined;
+  const outputTotal = Number(total.output_tokens ?? total.output ?? 0);
+  return Number.isFinite(outputTotal) ? { ts, outputTotal } : undefined;
+}
+
 async function scanFile(
   path: string,
   acc: Map<BuildingId, Bucket>,
@@ -98,6 +179,7 @@ async function scanFile(
 ): Promise<void> {
   const content = await readFile(path, 'utf8');
   let current: BuildingId = 'citadel'; // current session work building (last tool)
+  let codexOutputTotal = 0;
   for (const line of content.split('\n')) {
     if (!line) continue;
     let rec: any;
@@ -106,6 +188,22 @@ async function scanFile(
     } catch {
       continue;
     }
+    const codexTool = codexToolFromRecord(rec);
+    if (codexTool) {
+      current = resolveBuilding(codexTool.name, codexTool.detail, config);
+      continue;
+    }
+
+    const codexUsage = codexOutputTotalFromRecord(rec);
+    if (codexUsage) {
+      const delta = codexUsage.outputTotal - codexOutputTotal;
+      codexOutputTotal = codexUsage.outputTotal;
+      if (delta > 0) {
+        accumulateMessage(acc, { ts: codexUsage.ts, output: delta, tools: [] }, now, dayStart, current, config);
+      }
+      continue;
+    }
+
     const sample = sampleFromRecord(rec);
     if (!sample) continue;
     if (sample.tools.length) {

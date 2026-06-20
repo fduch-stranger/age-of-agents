@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { accumulateMessage, getBuildingStats, invalidateBuildingStatsCache } from '../src/building-stats.js';
+import { accumulateMessage, computeBuildingStats, getBuildingStats, invalidateBuildingStatsCache } from '../src/building-stats.js';
 import type { BuildingId, MappingConfig } from '@agent-citadel/shared';
 
 const DAY = 86_400_000;
@@ -83,6 +83,61 @@ function rootWithTool(tool: string): string {
   writeFileSync(join(dir, 'session.jsonl'), JSON.stringify(rec) + '\n');
   return dir;
 }
+
+function rootWithCodexRecords(records: unknown[]): string {
+  const dir = mkdtempSync(join(tmpdir(), 'aoa-codex-stats-'));
+  writeFileSync(
+    join(dir, 'rollout-2026-06-20T12-00-00-019ee492-d59e-7813-8277-dc58a1bb2c1e.jsonl'),
+    records.map((r) => JSON.stringify(r)).join('\n') + '\n',
+  );
+  return dir;
+}
+
+describe('computeBuildingStats - Codex rollout records', () => {
+  it('attributes Codex token_count output deltas to the latest Codex tool building', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: {
+          type: 'custom_tool_call',
+          name: 'apply_patch',
+          input: '*** Begin Patch\n*** Update File: src/app.ts\n@@\n-a\n+b\n*** End Patch',
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1200, output_tokens: 90 } },
+        },
+      },
+    ]);
+
+    const res = await computeBuildingStats(root, NOW + 2000);
+    expect(res.buildings.mine?.today).toBe(40);
+    expect(res.buildings.forge?.today).toBe(50);
+  });
+});
 
 describe('getBuildingStats - cache + invalidation during scan', () => {
   it('invalidate during an in-flight scan does NOT persist a stale result', async () => {
