@@ -24,7 +24,7 @@ export function ModelRegistryEditor() {
   const heroes = useWorld((s) => s.heroes);
   const t = useUi();
 
-  // Odrębne modele widziane w bieżących sesjach.
+  // Distinct models seen in current sessions.
   const seen = useMemo(() => {
     const set = new Set<string>();
     for (const h of Object.values(heroes)) if (h.model) set.add(h.model);
@@ -60,7 +60,7 @@ export function ModelRegistryEditor() {
         </div>
       )}
 
-      {/* Oś tożsamości. */}
+      {/* Identity axis. */}
       <Section title={`👤 ${t.spriteAndName}`}>
         {models.sprites.map((r, i) => (
           <SpriteRow
@@ -79,7 +79,7 @@ export function ModelRegistryEditor() {
         </button>
       </Section>
 
-      {/* Oś pojemności. */}
+      {/* Capacity axis. */}
       <Section title={`📦 ${t.contextWindowSection}`}>
         {models.windows.map((r, i) => (
           <WindowRow
@@ -224,7 +224,7 @@ function ModelJsonEditor({ models, setModels, t }: { models: ModelConfig; setMod
   const applyTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const fileRef = useRef<HTMLInputElement>(null);
 
-  // Gdy rejestr zmieni się z panelu, odśwież textarea — ale nie podczas pisania.
+  // When the registry changes from the panel, refresh textarea, but not while typing.
   useEffect(() => {
     if (focused.current) return;
     setText(JSON.stringify(models, null, 2));
@@ -266,7 +266,7 @@ function ModelJsonEditor({ models, setModels, t }: { models: ModelConfig; setMod
         onBlur={() => (focused.current = false)}
         onChange={(e) => onChange(e.target.value)}
       />
-      {/* Pobierz/wgraj plik JSON — bliźniaczo do sekcji budynków (mapping-io). */}
+      {/* Download/upload JSON file, mirroring the building section (mapping-io). */}
       <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
         <button className="ghost" onClick={() => downloadModelConfig(models)}>{t.downloadJson}</button>
         <button className="ghost" onClick={() => fileRef.current?.click()}>{t.uploadJson}</button>
@@ -277,7 +277,7 @@ function ModelJsonEditor({ models, setModels, t }: { models: ModelConfig; setMod
           style={{ display: 'none' }}
           onChange={async (e) => {
             const file = e.target.files?.[0];
-            e.target.value = ''; // pozwól wgrać ten sam plik ponownie
+            e.target.value = ''; // allow uploading the same file again
             if (!file) return;
             const res = parseUploadedModelConfig(await file.text());
             if (res.ok) {

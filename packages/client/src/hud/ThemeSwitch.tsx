@@ -5,7 +5,7 @@ import { HooksPanel } from './HooksPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { useMenuKeyboard } from './useMenuKeyboard';
 
-/** Lista języków do dropdownu: endonimy (nazwa w danym języku) + flaga + krótki kod. */
+/** Language dropdown list: endonyms (name in that language) + flag + short code. */
 const LANGS: { id: Lang; label: string; flag: string }[] = [
   { id: 'en', label: 'English', flag: '🇬🇧' },
   { id: 'pl', label: 'Polski', flag: '🇵🇱' },
@@ -27,7 +27,7 @@ export function ThemeSwitch() {
   const langTriggerRef = useRef<HTMLButtonElement>(null);
   const langMenuRef = useRef<HTMLDivElement>(null);
 
-  // Zamknij menu języka po kliknięciu poza nim lub naciśnięciu Esc (jak w ProjectSwitcher).
+  // Close the language menu after outside click or Esc (as in ProjectSwitcher).
   useEffect(() => {
     if (!langOpen) return;
     const onDown = (e: MouseEvent) => {
@@ -53,7 +53,7 @@ export function ThemeSwitch() {
     if (langRef.current?.contains(document.activeElement)) langTriggerRef.current?.focus();
   };
 
-  // Nawigacja klawiaturą w rozwiniętym menu języka (strzałki/Home/End + focus po otwarciu).
+  // Keyboard navigation in the expanded language menu (arrows/Home/End + focus after opening).
   useMenuKeyboard(langOpen, langMenuRef);
 
   return (
@@ -74,7 +74,7 @@ export function ThemeSwitch() {
       </button>
       <HooksPanel />
 
-      {/* ── Język jako dropdown (zamiast cyklicznego przycisku) ── */}
+      {/* Language as dropdown instead of a cycling button. */}
       <div ref={langRef} style={{ position: 'relative' }}>
         <button
           ref={langTriggerRef}
@@ -119,7 +119,7 @@ export function ThemeSwitch() {
         )}
       </div>
 
-      {/* ── Trybik: ustawienia (reakcje budynków) ── */}
+      {/* Gear: settings (building reactions). */}
       <button
         ref={gearRef}
         className="ghost"
@@ -136,7 +136,7 @@ export function ThemeSwitch() {
         <SettingsPanel
           onClose={() => {
             setSettingsOpen(false);
-            gearRef.current?.focus(); // przywróć fokus na trybik (a11y)
+            gearRef.current?.focus(); // restore focus to the gear (a11y)
           }}
         />
       )}

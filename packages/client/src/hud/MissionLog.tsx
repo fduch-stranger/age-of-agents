@@ -3,7 +3,7 @@ import { useWorld } from '../store';
 import { useUi } from '../i18n';
 import { clip } from '../util';
 
-/** Linia meta misji: KTO + projekt + branch (bez powielania treści promptu). */
+/** Mission meta line: WHO + project + branch (without repeating prompt content). */
 function metaLine(hero: HeroSnapshot | undefined, sessionId: string): string {
   const name = hero?.title || sessionId.slice(0, 8);
   const parts = [clip(name, 36)];
@@ -12,14 +12,14 @@ function metaLine(hero: HeroSnapshot | undefined, sessionId: string): string {
   return parts.join(' · ');
 }
 
-/** Dziennik misji: aktywne na górze, potem ostatnie ukończone. */
+/** Mission log: active items at top, then recently completed. */
 export function MissionLog() {
   const missions = useWorld((s) => s.missions);
   const heroes = useWorld((s) => s.heroes);
   const selected = useWorld((s) => s.selectedSessionId);
   const selectedBuilding = useWorld((s) => s.selectedBuildingId);
   const t = useUi();
-  if (selected || selectedBuilding) return null; // panel boczny/budynku przejmuje prawą stronę
+  if (selected || selectedBuilding) return null; // side/building panel owns the right side
 
   const all = Object.values(missions).sort((a, b) => b.startedAt.localeCompare(a.startedAt));
   const active = all.filter((m) => m.status === 'active').slice(0, 5);

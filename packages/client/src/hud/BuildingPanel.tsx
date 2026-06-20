@@ -10,7 +10,7 @@ import { StatTile } from './StatTile';
 
 const EMPTY: BuildingWindowStats = { today: 0, week: 0, month: 0 };
 
-/** Panel budynku: opis (co reprezentuje) + ile teraz pracuje + tokeny dziś/7d/30d. */
+/** Building panel: description (what it represents) + current workers + tokens today/7d/30d. */
 export function BuildingPanel() {
   const buildingId = useWorld((s) => s.selectedBuildingId);
   const heroes = useWorld((s) => s.heroes);
@@ -18,13 +18,13 @@ export function BuildingPanel() {
   const select = useWorld((s) => s.selectBuilding);
   const themeId = useSettings((s) => s.themeId);
   const lang = useSettings((s) => s.lang);
-  const mapping = useMapping((s) => s.mapping); // re-render gdy user przemapuje narzędzia
+  const mapping = useMapping((s) => s.mapping); // re-render when user remaps tools
   const t = useUi();
   const [stats, setStats] = useState<BuildingStatsResponse | undefined>();
   const [loading, setLoading] = useState(false);
 
-  // Statystyki historyczne: skan transkryptów po stronie serwera (cache 60 s).
-  // Odświeżamy przy otwarciu i co 60 s, dopóki panel jest widoczny.
+  // Historical statistics: server-side transcript scan (60s cache).
+  // Refresh on open and every 60s while the panel is visible.
   useEffect(() => {
     if (!buildingId) return;
     let alive = true;
@@ -49,7 +49,7 @@ export function BuildingPanel() {
   const bt = buildingText(themeId, buildingId as BuildingId, lang);
   const win = stats?.buildings[buildingId as keyof typeof stats.buildings] ?? EMPTY;
 
-  // "Teraz pracuje" — na żywo ze stanu świata (bohaterowie + peony przy tym budynku).
+  // "Working now": live from world state (heroes + peons at this building).
   const workerHeroes = Object.values(heroes).filter(
     (h) => h.state === 'working' && resolveBuilding(h.currentTool, h.toolDetail, mapping) === buildingId,
   );
@@ -58,8 +58,8 @@ export function BuildingPanel() {
   );
   const workingNow = workerHeroes.length + workerPeons.length;
 
-  // Lista „co się tu działo" — ostatnie akcje WSZYSTKICH bohaterów odfiltrowane do
-  // tego budynku (z bufora recentActions), najnowsze pierwsze.
+  // "What happened here" list: latest actions from ALL heroes filtered to this
+  // building (from recentActions buffer), newest first.
   const now = Date.now();
   const activity = Object.values(heroes)
     .flatMap((h) => (h.recentActions ?? []).map((a) => ({ a, hero: h })))
@@ -133,4 +133,3 @@ export function BuildingPanel() {
     </div>
   );
 }
-

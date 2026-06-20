@@ -1,10 +1,10 @@
-/** Procent zapełnienia okna kontekstu, 0..100 (zaokrąglony, clamp). Okno podane z zewnątrz. */
+/** Context-window fill percentage, 0..100 (rounded, clamped). Window is provided externally. */
 export function contextPct(tokens: number, windowSize: number): number {
   if (!(windowSize > 0)) return 0;
   return Math.min(100, Math.round((tokens / windowSize) * 100));
 }
 
-/** Kolor wypełnienia wg %: zielony ≤10 → żółty ≤50 → ku czerwieni do 100. */
+/** Fill color by percentage: green <=10, yellow <=50, toward red up to 100. */
 export function contextColor(pct: number): string {
   if (pct <= 10) return '#5dcaa5';
   if (pct <= 50) return '#f0d76e';
