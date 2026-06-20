@@ -16,8 +16,8 @@ import { codexToolToCanonical } from './sources/codex.js';
  * Token usage per building for day/week/30-day windows.
  *
  * Historical data does NOT exist in memory (watcher sees only live sessions), so
- * scan transcripts under ~/.claude/projects: assign each assistant message's
- * OUTPUT tokens to the building of the tool it used (toolToBuilding), split
+ * scan transcripts under ~/.claude/projects and ~/.codex/sessions: assign each
+ * assistant message's OUTPUT tokens to the building of the tool it used, split
  * evenly when it touched multiple buildings. A message without a tool (reasoning/
  * text only) is assigned to the building where the session is CURRENTLY working
  * (last used tool); otherwise Citadel (fallback) would swallow most tokens. The
@@ -30,6 +30,10 @@ import { codexToolToCanonical } from './sources/codex.js';
 const DAY = 86_400_000;
 const MONTH = 30 * DAY;
 const CACHE_TTL = 60_000;
+const DEFAULT_STATS_ROOTS = [
+  join(homedir(), '.claude', 'projects'),
+  join(homedir(), '.codex', 'sessions'),
+];
 
 interface Bucket {
   today: number;
@@ -214,21 +218,18 @@ async function scanFile(
   }
 }
 
-export async function computeBuildingStats(
+async function scanRoot(
   root: string,
+  acc: Map<BuildingId, Bucket>,
   now: number,
-  config: MappingConfig = DEFAULT_MAPPING,
-): Promise<BuildingStatsResponse> {
-  const ds = new Date(now);
-  ds.setHours(0, 0, 0, 0);
-  const dayStart = ds.getTime();
-
-  const acc = new Map<BuildingId, Bucket>();
+  dayStart: number,
+  config: MappingConfig,
+): Promise<void> {
   let entries: string[] = [];
   try {
     entries = await readdir(root, { recursive: true });
   } catch {
-    return { updatedAt: new Date(now).toISOString(), buildings: {} };
+    return;
   }
 
   for (const rel of entries) {
@@ -242,6 +243,21 @@ export async function computeBuildingStats(
       /* skip unreadable file */
     }
   }
+}
+
+export async function computeBuildingStatsForRoots(
+  roots: string[],
+  now: number,
+  config: MappingConfig = DEFAULT_MAPPING,
+): Promise<BuildingStatsResponse> {
+  const ds = new Date(now);
+  ds.setHours(0, 0, 0, 0);
+  const dayStart = ds.getTime();
+
+  const acc = new Map<BuildingId, Bucket>();
+  for (const root of roots) {
+    await scanRoot(root, acc, now, dayStart, config);
+  }
 
   const buildings: BuildingStatsResponse['buildings'] = {};
   for (const [b, v] of acc) {
@@ -252,6 +268,14 @@ export async function computeBuildingStats(
     } satisfies BuildingWindowStats;
   }
   return { updatedAt: new Date(now).toISOString(), buildings };
+}
+
+export async function computeBuildingStats(
+  root: string,
+  now: number,
+  config: MappingConfig = DEFAULT_MAPPING,
+): Promise<BuildingStatsResponse> {
+  return computeBuildingStatsForRoots([root], now, config);
 }
 
 // Cache: scan is expensive (many sessions x 30 days), so compute at most once/min.
@@ -270,14 +294,15 @@ export function invalidateBuildingStatsCache(): void {
 }
 
 export async function getBuildingStats(
-  root = join(homedir(), '.claude', 'projects'),
+  root: string | string[] = DEFAULT_STATS_ROOTS,
 ): Promise<BuildingStatsResponse> {
   const now = Date.now();
   if (cache && now - cache.at < CACHE_TTL) return cache.data;
   if (inflight) return inflight;
   const startEpoch = epoch;
+  const roots = Array.isArray(root) ? root : [root];
   inflight = loadMappingConfig()
-    .then((config) => computeBuildingStats(root, now, config))
+    .then((config) => computeBuildingStatsForRoots(roots, now, config))
     .then((data) => {
       // Save cache only if the map was not invalidated in the meantime.
       if (epoch === startEpoch) {

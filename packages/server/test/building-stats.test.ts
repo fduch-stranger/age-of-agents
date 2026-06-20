@@ -140,6 +140,54 @@ describe('computeBuildingStats - Codex rollout records', () => {
 });
 
 describe('getBuildingStats - cache + invalidation during scan', () => {
+  it('merges stats from explicit Claude and Codex roots', async () => {
+    invalidateBuildingStatsCache();
+    const claudeRoot = rootWithTool('Read'); // -> library
+    const ts = Date.now() - 2000;
+    const codexRoot = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(ts).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(ts).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      {
+        type: 'response_item',
+        timestamp: new Date(ts + 1000).toISOString(),
+        payload: {
+          type: 'custom_tool_call',
+          name: 'apply_patch',
+          input: '*** Begin Patch\n*** Update File: src/app.ts\n@@\n-a\n+b\n*** End Patch',
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(ts + 1000).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1200, output_tokens: 90 } },
+        },
+      },
+    ]);
+    const res = await getBuildingStats([claudeRoot, codexRoot]);
+    expect(res.buildings.library?.month).toBe(100);
+    expect(res.buildings.mine?.month).toBe(40);
+    expect(res.buildings.forge?.month).toBe(50);
+
+    invalidateBuildingStatsCache();
+  });
+
   it('invalidate during an in-flight scan does NOT persist a stale result', async () => {
     invalidateBuildingStatsCache();
     const rootEdit = rootWithTool('Edit'); // -> forge
