@@ -4,6 +4,7 @@ dist/
 .DS_Store
 .superpowers/
 .playwright-mcp/
+.worktrees/
 
 # Surowe paczki pobierane offline (npm run assets) trafiają do downloads/.
 # Do repo commitujemy WYŁĄCZNIE własne atlasy PixelLab z public/assets/.
