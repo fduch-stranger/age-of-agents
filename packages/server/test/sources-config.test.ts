@@ -7,6 +7,7 @@ import {
   parseSourceFilter,
   rootIfExists,
 } from '../src/sources/config.js';
+import { activeSources } from '../src/sources/index.js';
 import type { AgentSource } from '../src/sources/types.js';
 
 const source = (id: AgentSource['id']): AgentSource => ({
@@ -72,5 +73,12 @@ describe('sources config', () => {
       vi.doUnmock('node:fs');
       vi.resetModules();
     }
+  });
+});
+
+describe('activeSources', () => {
+  it('uses AOA_SOURCES-style filtering over registered sources', () => {
+    expect(activeSources('codex').map((s) => s.id)).toEqual(['codex']);
+    expect(activeSources('claude,codex').map((s) => s.id)).toEqual(['claude', 'codex']);
   });
 });

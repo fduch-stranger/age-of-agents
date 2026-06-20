@@ -6,6 +6,7 @@ import { registerMappingRoutes } from './mapping-routes.js';
 import { registerModelRoutes } from './model-routes.js';
 import { OpenCodePoller } from './sources/opencode-poller.js';
 import { ArsenalPoller } from './arsenal/arsenal-poller.js';
+import type { SourceWatcher } from './watcher.js';
 
 export interface StartServerOptions {
   /** Port HTTP. Podaj 0, by system wybrał wolny (przydatne w testach). */
@@ -27,6 +28,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   const host = opts.host ?? '127.0.0.1';
   const app = Fastify({ logger: { level: 'info' } });
   const world = new World();
+  let watchers: SourceWatcher[] = [];
+  let opencodePoller: OpenCodePoller | undefined;
+  let arsenalPoller: ArsenalPoller | undefined;
 
   app.get('/health', async () => ({ ok: true, demo: opts.demo }));
 
@@ -40,24 +44,29 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     registerModelRoutes(app, { persist: false });
   } else {
     const { SourceWatcher } = await import('./watcher.js');
-    const { SOURCES } = await import('./sources/index.js');
+    const { activeSources } = await import('./sources/index.js');
     const { translateHook, hooksInstalled, installHooks, uninstallHooks } = await import('./hooks.js');
     const { getBuildingStats, invalidateBuildingStatsCache } = await import('./building-stats.js');
-    const watchers = SOURCES.map((source) => new SourceWatcher(world, source));
+    const sources = activeSources(process.env.AOA_SOURCES);
+    watchers = sources.map((source) => new SourceWatcher(world, source));
     // Hooki HTTP są kanałem Claude → kierujemy je do watchera Claude.
-    const claudeWatcher = watchers.find((w) => w.id === 'claude') ?? watchers[0];
+    const claudeWatcher = watchers.find((w) => w.id === 'claude');
     
     // OpenCode używa SQLite zamiast JSONL - uruchom poller
-    const opencodePoller = new OpenCodePoller(world);
+    const opencodeEnabled = sources.some((source) => source.id === 'opencode');
+    opencodePoller = opencodeEnabled ? new OpenCodePoller(world) : undefined;
 
     app.get('/building-stats', async () => getBuildingStats());
     // Mapa narzędzie→budynek: lokalny serwer = źródło prawdy (plik na dysku usera);
     // zapis invaliduje cache statystyk, by liczby nadążały za nową mapą.
     registerMappingRoutes(app, { persist: true, onSaved: invalidateBuildingStatsCache });
     registerModelRoutes(app, { persist: true });
-    app.post('/hooks', async (request) => {
+    app.post('/hooks', async (request, reply) => {
       const translated = translateHook((request.body ?? {}) as never);
-      if (translated) claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts);
+      if (translated) {
+        if (!claudeWatcher) return reply.code(409).send({ ok: false, error: 'claude source disabled' });
+        claudeWatcher.applyExternalFacts(translated.sessionId, translated.projectDir, translated.facts);
+      }
       return { ok: true };
     });
     app.get('/hooks/status', async () => ({ installed: await hooksInstalled() }));
@@ -72,9 +81,10 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
 
     app.addHook('onReady', async () => {
       for (const w of watchers) w.start();
-      await opencodePoller.start();
+      await opencodePoller?.start();
       // `arsenal-updated` event do klienta (panel Arsenału).
-      new ArsenalPoller(world).start();
+      arsenalPoller = new ArsenalPoller(world);
+      arsenalPoller.start();
       app.log.info(`Source watchers active: ${watchers.map((w) => w.id).join(', ')}`);
     });
   }
@@ -127,6 +137,9 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     port: actualPort,
     close: async () => {
       offEvent();
+      await opencodePoller?.stop();
+      await Promise.all(watchers.map((w) => w.stop()));
+      arsenalPoller?.stop();
       await new Promise<void>((resolve, reject) =>
         wss.close((err) => (err ? reject(err) : resolve())),
       );
