@@ -3,6 +3,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 import {
   completedBuildingForTheme,
+  recoveryBuildingForTheme,
   resolveBuilding,
   DEFAULT_MAPPING,
   type BuildingId,
@@ -11,7 +12,7 @@ import {
   type MappingConfig,
 } from '@agent-citadel/shared';
 import { loadMappingConfig } from './mapping-config.js';
-import { codexToolToCanonical } from './sources/codex.js';
+import { codexQualifiedToolName, codexToolToCanonical } from './sources/codex.js';
 
 /**
  * Token usage per building for day/week/30-day windows.
@@ -134,6 +135,11 @@ function codexToolDetail(name: string, raw: unknown): string | undefined {
     return match ? match[1].split('/').pop() : undefined;
   }
 
+  if (name === 'web.run') {
+    const q = args.search_query?.[0]?.q ?? args.image_query?.[0]?.q;
+    return str(q);
+  }
+
   return str(args.path) ?? str(args.file_path) ?? str(args.query);
 }
 
@@ -147,10 +153,11 @@ function codexToolFromRecord(rec: any): { ts: number; name: string; detail?: str
   if (payload.type === 'function_call' || payload.type === 'custom_tool_call') {
     const rawName = str(payload.name);
     if (!rawName) return undefined;
+    const qualifiedName = codexQualifiedToolName(rawName, str(payload.namespace));
     return {
       ts,
-      name: codexToolToCanonical(rawName),
-      detail: codexToolDetail(rawName, payload.arguments ?? payload.input),
+      name: codexToolToCanonical(rawName, str(payload.namespace)),
+      detail: codexToolDetail(qualifiedName, payload.arguments ?? payload.input),
     };
   }
 
@@ -181,8 +188,18 @@ function codexTurnEndFromRecord(rec: any): boolean {
   return payload?.type === 'task_complete' || payload?.type === 'turn_complete';
 }
 
+function codexTurnAbortedFromRecord(rec: any): boolean {
+  if (rec?.type !== 'event_msg') return false;
+  const payload = rec.payload;
+  return payload?.type === 'turn_aborted';
+}
+
 function completedBuildingsForAllThemes(): BuildingId[] {
   return [...new Set([completedBuildingForTheme('fantasy'), completedBuildingForTheme('scifi')])];
+}
+
+function recoveryBuildingsForAllThemes(): BuildingId[] {
+  return [...new Set([recoveryBuildingForTheme('fantasy'), recoveryBuildingForTheme('scifi')])];
 }
 
 async function scanFile(
@@ -195,6 +212,24 @@ async function scanFile(
   const content = await readFile(path, 'utf8');
   let current: BuildingId[] = ['citadel']; // current session work building(s)
   let codexOutputTotal = 0;
+  let pendingCodexOutput: { ts: number; output: number; buildings: BuildingId[] } | undefined;
+
+  const flushPendingCodexOutput = (overrideBuildings?: BuildingId[]): void => {
+    if (!pendingCodexOutput) return;
+    const buildings = overrideBuildings ?? pendingCodexOutput.buildings;
+    for (const building of buildings) {
+      accumulateMessage(
+        acc,
+        { ts: pendingCodexOutput.ts, output: pendingCodexOutput.output, tools: [] },
+        now,
+        dayStart,
+        building,
+        config,
+      );
+    }
+    pendingCodexOutput = undefined;
+  };
+
   for (const line of content.split('\n')) {
     if (!line) continue;
     let rec: any;
@@ -205,11 +240,18 @@ async function scanFile(
     }
     if (codexTurnEndFromRecord(rec)) {
       current = completedBuildingsForAllThemes();
+      flushPendingCodexOutput(current);
+      continue;
+    }
+    if (codexTurnAbortedFromRecord(rec)) {
+      current = recoveryBuildingsForAllThemes();
+      flushPendingCodexOutput(current);
       continue;
     }
 
     const codexTool = codexToolFromRecord(rec);
     if (codexTool) {
+      flushPendingCodexOutput();
       current = [resolveBuilding(codexTool.name, codexTool.detail, config)];
       continue;
     }
@@ -219,21 +261,22 @@ async function scanFile(
       const delta = codexUsage.outputTotal - codexOutputTotal;
       codexOutputTotal = codexUsage.outputTotal;
       if (delta > 0) {
-        for (const building of current) {
-          accumulateMessage(acc, { ts: codexUsage.ts, output: delta, tools: [] }, now, dayStart, building, config);
-        }
+        flushPendingCodexOutput();
+        pendingCodexOutput = { ts: codexUsage.ts, output: delta, buildings: current };
       }
       continue;
     }
 
     const sample = sampleFromRecord(rec);
     if (!sample) continue;
+    flushPendingCodexOutput();
     if (sample.tools.length) {
       const last = sample.tools[sample.tools.length - 1];
       current = [resolveBuilding(last.name, last.detail, config)];
     }
     accumulateMessage(acc, sample, now, dayStart, current[0] ?? 'citadel', config);
   }
+  flushPendingCodexOutput();
 }
 
 async function scanRoot(

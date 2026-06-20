@@ -1,5 +1,5 @@
 import { basename } from 'node:path';
-import type { ActionEntry, AgentKind, HeroSnapshot, HeroStateKind, WieldedArsenal } from '@agent-citadel/shared';
+import type { ActionEntry, AgentKind, HeroSnapshot, WieldedArsenal } from '@agent-citadel/shared';
 import type { Fact } from './transcript/facts.js';
 import { cleanTitle, isSubstantialPrompt } from './transcript/title.js';
 import type { World } from './world.js';
@@ -243,6 +243,14 @@ export class SessionTracker {
         }
         break;
 
+      case 'turn-aborted':
+        this.patch({ state: 'recovering', currentTool: undefined, toolDetail: undefined }, fact.ts);
+        if (this.activeMissionId) {
+          this.world.completeMission(this.activeMissionId, 'failed', fact.ts);
+          this.activeMissionId = undefined;
+        }
+        break;
+
       case 'attribution': {
         let changed = false;
         if (fact.skill && !this.wieldedSkills.has(fact.skill)) { this.wieldedSkills.add(fact.skill); changed = true; }
@@ -287,7 +295,7 @@ export class SessionTracker {
       this.world.upsertHero({ ...hero, state: 'sleeping' });
     } else if (
       sinceActivity > this.thresholds.idleAfterMs &&
-      (hero.state === 'returning' || hero.state === 'working' || hero.state === 'thinking')
+      (hero.state === 'returning' || hero.state === 'recovering' || hero.state === 'working' || hero.state === 'thinking')
     ) {
       this.world.upsertHero({ ...hero, state: 'idle', currentTool: undefined, toolDetail: undefined });
     }

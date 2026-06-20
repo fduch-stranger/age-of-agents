@@ -14,6 +14,7 @@ export type HeroStateKind =
   | 'idle'
   | 'sleeping'
   | 'error'
+  | 'recovering'
   | 'returning';
 
 /** One hero action (tool use), shown in the panel's recent actions timeline. */
@@ -277,6 +278,11 @@ const COMPLETED_BUILDING_BY_THEME: Record<string, BuildingId> = {
   scifi: 'hydroponics',
 };
 
+const RECOVERY_BUILDING_BY_THEME: Record<string, BuildingId> = {
+  fantasy: 'shrine',
+  scifi: 'medbay',
+};
+
 function projectHash(s: string): number {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
@@ -285,12 +291,13 @@ function projectHash(s: string): number {
 
 export function homeBuildingForTheme(
   themeId: string,
-  hero: Pick<HeroSnapshot, 'projectName' | 'projectDir'>,
+  hero: Pick<HeroSnapshot, 'projectName' | 'projectDir'> & Partial<Pick<HeroSnapshot, 'sessionId'>>,
 ): BuildingId {
   const options = HOME_BUILDINGS_BY_THEME[themeId];
   if (!options || options.length === 0) return 'citadel';
-  const key = hero.projectName ?? hero.projectDir ?? '';
-  if (!key) return 'citadel';
+  const base = hero.projectName ?? hero.projectDir ?? '';
+  if (!base) return 'citadel';
+  const key = hero.sessionId ? `${base}:${hero.sessionId}` : base;
   return options[projectHash(key) % options.length];
 }
 
@@ -302,13 +309,20 @@ export function completedBuildingForTheme(themeId: string): BuildingId {
   return COMPLETED_BUILDING_BY_THEME[themeId] ?? 'citadel';
 }
 
+export function recoveryBuildingForTheme(themeId: string): BuildingId {
+  return RECOVERY_BUILDING_BY_THEME[themeId] ?? 'citadel';
+}
+
 export function activityBuildingForHero(
   themeId: string,
-  hero: Pick<HeroSnapshot, 'state' | 'currentTool' | 'toolDetail' | 'projectName' | 'projectDir'>,
+  hero: Pick<HeroSnapshot, 'state' | 'currentTool' | 'toolDetail' | 'projectName' | 'projectDir'> & Partial<Pick<HeroSnapshot, 'sessionId'>>,
   config: MappingConfig,
 ): BuildingId | undefined {
   if (hero.state === 'working') return resolveBuilding(hero.currentTool, hero.toolDetail, config);
   if (hero.state === 'awaiting-input') return awaitingBuildingForTheme(themeId);
+  if (hero.state === 'returning') return completedBuildingForTheme(themeId);
+  if (hero.state === 'recovering' || hero.state === 'error') return recoveryBuildingForTheme(themeId);
+  if (hero.state === 'idle' || hero.state === 'sleeping') return homeBuildingForTheme(themeId, hero);
   return undefined;
 }
 

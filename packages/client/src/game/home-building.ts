@@ -3,6 +3,8 @@ import {
   activityBuildingForHero,
   awaitingBuildingForTheme,
   homeBuildingForTheme,
+  completedBuildingForTheme,
+  recoveryBuildingForTheme,
   type BuildingId,
   type HeroSnapshot,
 } from '@agent-citadel/shared';
@@ -14,12 +16,20 @@ export function awaitingBuilding(themeId: string): BuildingId {
   return awaitingBuildingForTheme(themeId);
 }
 
+export function completedBuilding(themeId: string): BuildingId {
+  return completedBuildingForTheme(themeId);
+}
+
+export function recoveryBuilding(themeId: string): BuildingId {
+  return recoveryBuildingForTheme(themeId);
+}
+
 /**
  * Returns the building id where a NEW unit for this session should appear. If
  * the theme has no gathering points or the project is missing, fall back to the
  * citadel (the original destination).
  */
-export function homeBuilding(theme: ThemeDef, hero: Pick<HeroSnapshot, 'projectName' | 'projectDir'>): BuildingId {
+export function homeBuilding(theme: ThemeDef, hero: Pick<HeroSnapshot, 'sessionId' | 'projectName' | 'projectDir'>): BuildingId {
   return homeBuildingForTheme(theme.id, hero);
 }
 

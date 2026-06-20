@@ -20,7 +20,7 @@ import { peonSpawnScatter, heroSpawnScatter } from './scatter';
 import { buildTerrainMap } from './terrain-map';
 import { BUILDING_FX, collectActiveBuildings, type WorkerSample } from './building-fx';
 import { buildingText } from '../i18n';
-import { homeBuilding, awaitingBuilding } from './home-building';
+import { homeBuilding, awaitingBuilding, completedBuilding, recoveryBuilding } from './home-building';
 import { worldLayerTransform, worldToViewport, flipTextNodes } from './flip';
 import type { Lang } from '../settings';
 import { contextPct } from '../context-progress';
@@ -94,6 +94,7 @@ export class GameView {
   private retiring = new Map<string, { unit: Unit; deadline: number }>();
   private targets = new Map<string, string>();
   private lastBuilding = new Map<string, BuildingId>(); // last workshop: the unit "lives" here, not in Citadel
+  private homeByUnit = new Map<string, BuildingId>(); // stable social/off-duty home per hero
   private wanderAt = new Map<string, number>(); // elapsed time of next small idle-hero walk
   private worldLayer!: Container;
   private worldWidth = 0;
@@ -465,10 +466,9 @@ export class GameView {
         unit.container.on('pointertap', () => useWorld.getState().select(sessionId));
         this.units.set(hero.sessionId, unit);
         this.unitLayer.addChild(unit.container);
-        // Remember the "home" building; otherwise idle/thinking heroes return to
-        // Citadel (fallback in steer/wanderIdle) and stand in the plaza. With a
-        // remembered home they return to the correct gathering point.
+        // Remember the social home separately from the last work building.
         if (this.flipped) flipTextNodes(unit.container);
+        this.homeByUnit.set(hero.sessionId, homeId);
         this.lastBuilding.set(hero.sessionId, homeId);
         this.lastClearedAt.set(hero.sessionId, hero.clearedAt ?? 0);
       }
@@ -511,6 +511,7 @@ export class GameView {
       if (!seen.has(id)) {
         this.units.delete(id);
         this.targets.delete(id);
+        this.homeByUnit.delete(id);
         this.lastClearedAt.delete(id);
         if (unit.isPeon) {
           this.retirePeon(unit);
@@ -746,7 +747,7 @@ export class GameView {
       if (unit.isPeon || unit.moving || unit.stateKind !== 'idle') continue;
       if (this.elapsed < (this.wanderAt.get(id) ?? 0)) continue;
       this.wanderAt.set(id, this.elapsed + 5 + (hashId(id) % 5)); // 5-10s, desynchronized per unit
-      const door = this.building(this.lastBuilding.get(id) ?? 'citadel').door;
+      const door = this.building(this.homeByUnit.get(id) ?? this.lastBuilding.get(id) ?? 'citadel').door;
       const k = (Math.floor(this.elapsed * 7) + hashId(id)) >>> 0;
       const angle = (k % 360) * (Math.PI / 180);
       const radius = 1.2 + (k % 5) * 0.5; // 1.2-3.2 tiles around the workshop
@@ -769,14 +770,17 @@ export class GameView {
       // Czeka na usera → idzie do kaplicy/poczekalni. NIE nadpisujemy lastBuilding,
       // so after an answer it returns to its workshop (idle -> last workshop).
       buildingId = awaitingBuilding(this.theme.id);
-    } else if (!unit.isPeon && (state === 'thinking' || state === 'error')) {
+    } else if (!unit.isPeon && state === 'returning') {
+      buildingId = completedBuilding(this.theme.id);
+    } else if (!unit.isPeon && (state === 'recovering' || state === 'error')) {
+      buildingId = recoveryBuilding(this.theme.id);
+    } else if (!unit.isPeon && state === 'thinking') {
       this.targets.delete(unit.id); // hero: stay where you are (thinking at workshop)
       return;
     } else {
-      // idle/sleeping/returning: do NOT return to Citadel; stay by the LAST workshop.
-      // A colony spread across buildings feels alive; only no work history -> default home.
+      // idle/sleeping: off-duty heroes return to their stable social home.
       const fallback: BuildingId = unit.isPeon ? 'barracks' : 'citadel';
-      buildingId = this.lastBuilding.get(unit.id) ?? fallback;
+      buildingId = (!unit.isPeon ? this.homeByUnit.get(unit.id) : undefined) ?? this.lastBuilding.get(unit.id) ?? fallback;
     }
 
     const key = `${state === 'working' ? 'w' : 'home'}:${buildingId}`;

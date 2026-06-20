@@ -39,13 +39,26 @@ export function isCodexHumanPrompt(text: string, role: string | undefined): bool
  * The canonical name flows into toolToBuilding (shared), so it controls which
  * building the unit walks to. This is the heart of the Codex metaphor.
  * ───────────────────────────────────────────────────────────────── */
-export function codexToolToCanonical(name: string): string {
-  switch (name) {
+export function codexQualifiedToolName(name: string, namespace?: string): string {
+  const ns = str(namespace);
+  if (!ns) return name;
+  if (name.startsWith(`${ns}.`) || name.startsWith(`${ns}__`)) return name;
+  if (ns.startsWith('mcp__')) {
+    const base = ns.endsWith('__') ? ns.slice(0, -2) : ns;
+    return `${base}__${name}`;
+  }
+  return `${ns}.${name}`;
+}
+
+export function codexToolToCanonical(name: string, namespace?: string): string {
+  const qualifiedName = codexQualifiedToolName(name, namespace);
+  switch (qualifiedName) {
     case 'shell':
     case 'local_shell':
     case 'exec':
     case 'exec_command':
     case 'functions.exec_command':
+    case 'write_stdin':
     case 'functions.write_stdin':
       return 'Bash'; // kopalnia (git w argumentach → targ, jak u Claude)
     case 'apply_patch':
@@ -64,24 +77,36 @@ export function codexToolToCanonical(name: string): string {
     case 'tool_search_call':
     case 'tool_search_tool':
     case 'tool_search.tool_search_tool':
+    case 'list_mcp_resources':
+    case 'functions.list_mcp_resources':
+    case 'list_mcp_resource_templates':
+    case 'functions.list_mcp_resource_templates':
       return 'ToolSearch';
+    case 'read_mcp_resource':
+    case 'functions.read_mcp_resource':
+      return 'Read';
+    case 'request_user_input':
     case 'functions.request_user_input':
       return 'AskUserQuestion';
     case 'update_plan':
+    case 'update_goal':
+    case 'create_goal':
+    case 'get_goal':
     case 'functions.update_plan':
     case 'functions.update_goal':
     case 'functions.create_goal':
     case 'functions.get_goal':
     case 'multi_tool_use.parallel':
+    case 'multi_agent_v1.spawn_agent':
       return 'Workflow';
     case 'js':
       return 'mcp__node_repl__js';
     default:
       // Codex MCP tools: 'server__tool' or 'server.tool'.
-      if (name.startsWith('mcp__')) return name;
-      if (name.includes('__')) return `mcp__${name}`;
-      if (name.includes('.')) return `mcp__${name.replace(/\./g, '__')}`;
-      return name; // nieznane → twierdza (fallback w toolToBuilding)
+      if (qualifiedName.startsWith('mcp__')) return qualifiedName;
+      if (qualifiedName.includes('__')) return `mcp__${qualifiedName}`;
+      if (qualifiedName.includes('.')) return `mcp__${qualifiedName.replace(/\./g, '__')}`;
+      return qualifiedName; // nieznane → twierdza (fallback w toolToBuilding)
   }
 }
 
@@ -273,10 +298,11 @@ export function interpretCodexLine(line: string): Fact[] {
         case 'function_call': {
           const name = str(payload.name);
           if (name) {
+            const rawName = codexQualifiedToolName(name, str(payload.namespace));
             facts.push({
               kind: 'tool-start',
-              tool: codexToolToCanonical(name),
-              detail: codexToolDetail(name, payload.arguments),
+              tool: codexToolToCanonical(name, str(payload.namespace)),
+              detail: codexToolDetail(rawName, payload.arguments),
               messageId: str(payload.call_id) ?? `codex-${ts}`,
               ts,
             });
@@ -289,10 +315,11 @@ export function interpretCodexLine(line: string): Fact[] {
         case 'custom_tool_call': {
           const name = str(payload.name);
           if (name) {
+            const rawName = codexQualifiedToolName(name, str(payload.namespace));
             facts.push({
               kind: 'tool-start',
-              tool: codexToolToCanonical(name),
-              detail: codexToolDetail(name, payload.arguments ?? payload.input),
+              tool: codexToolToCanonical(name, str(payload.namespace)),
+              detail: codexToolDetail(rawName, payload.arguments ?? payload.input),
               messageId: str(payload.call_id) ?? `codex-${ts}`,
               ts,
             });
@@ -323,8 +350,12 @@ export function interpretCodexLine(line: string): Fact[] {
       if (payload.type === 'token_count') {
         const u = extractCodexUsage(payload);
         if (u) facts.push({ kind: 'usage-total', ...u });
+      } else if (payload.type === 'task_started') {
+        facts.push({ kind: 'thinking', ts });
       } else if (payload.type === 'task_complete' || payload.type === 'turn_complete') {
         facts.push({ kind: 'turn-end', ts });
+      } else if (payload.type === 'turn_aborted') {
+        facts.push({ kind: 'turn-aborted', ts });
       }
       break;
     }

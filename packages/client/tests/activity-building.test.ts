@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_MAPPING } from '@agent-citadel/shared';
+import { DEFAULT_MAPPING, homeBuildingForTheme } from '@agent-citadel/shared';
 import { activityBuildingForAction, activityBuildingForHero } from '../src/game/home-building';
 
 describe('activity building attribution', () => {
@@ -20,25 +20,66 @@ describe('activity building attribution', () => {
     }, DEFAULT_MAPPING)).toBe('shrine');
   });
 
-  it('does not infer idle or sleeping physical location from project home', () => {
+  it('routes idle and sleeping sessions to a stable social home', () => {
     expect(activityBuildingForHero('fantasy', {
       state: 'idle',
+      sessionId: 'session-a',
       projectName: 'age-of-agents',
       projectDir: '/repo/age-of-agents',
-    }, DEFAULT_MAPPING)).toBeUndefined();
+    }, DEFAULT_MAPPING)).toBe(homeBuildingForTheme('fantasy', {
+      sessionId: 'session-a',
+      projectName: 'age-of-agents',
+      projectDir: '/repo/age-of-agents',
+    }));
     expect(activityBuildingForHero('fantasy', {
       state: 'sleeping',
+      sessionId: 'session-a',
       projectName: 'age-of-agents',
       projectDir: '/repo/age-of-agents',
-    }, DEFAULT_MAPPING)).toBeUndefined();
+    }, DEFAULT_MAPPING)).toBe(homeBuildingForTheme('fantasy', {
+      sessionId: 'session-a',
+      projectName: 'age-of-agents',
+      projectDir: '/repo/age-of-agents',
+    }));
   });
 
-  it('does not count returning sessions as social-building presence', () => {
+  it('distributes home buildings by session within the same project', () => {
+    expect(homeBuildingForTheme('scifi', {
+      sessionId: 'session-a',
+      projectName: 'age-of-agents',
+      projectDir: '/repo/age-of-agents',
+    })).toBe('medbay');
+    expect(homeBuildingForTheme('scifi', {
+      sessionId: 'session-b',
+      projectName: 'age-of-agents',
+      projectDir: '/repo/age-of-agents',
+    })).toBe('holodeck');
+  });
+
+  it('routes returning sessions to the completed social building', () => {
     expect(activityBuildingForHero('fantasy', {
       state: 'returning',
       projectName: 'age-of-agents',
       projectDir: '/repo/age-of-agents',
-    }, DEFAULT_MAPPING)).toBeUndefined();
+    }, DEFAULT_MAPPING)).toBe('garden');
+    expect(activityBuildingForHero('scifi', {
+      state: 'returning',
+      projectName: 'age-of-agents',
+      projectDir: '/repo/age-of-agents',
+    }, DEFAULT_MAPPING)).toBe('hydroponics');
+  });
+
+  it('routes recovering sessions to the recovery social building', () => {
+    expect(activityBuildingForHero('fantasy', {
+      state: 'recovering',
+      projectName: 'age-of-agents',
+      projectDir: '/repo/age-of-agents',
+    }, DEFAULT_MAPPING)).toBe('shrine');
+    expect(activityBuildingForHero('scifi', {
+      state: 'recovering',
+      projectName: 'age-of-agents',
+      projectDir: '/repo/age-of-agents',
+    }, DEFAULT_MAPPING)).toBe('medbay');
   });
 
   it('assigns completed action entries to theme resting buildings', () => {

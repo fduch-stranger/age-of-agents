@@ -50,14 +50,14 @@ export function BuildingPanel() {
   const bt = buildingText(themeId, buildingId as BuildingId, lang);
   const win = stats?.buildings[buildingId as keyof typeof stats.buildings] ?? EMPTY;
 
-  // "Working now": live from world state (heroes + peons at this building).
-  const workerHeroes = Object.values(heroes).filter(
+  // Current presence: live from world state (heroes + peons at this building).
+  const presentHeroes = Object.values(heroes).filter(
     (h) => activityBuildingForHero(themeId, h, mapping) === buildingId,
   );
-  const workerPeons = Object.values(peons).filter(
+  const presentPeons = Object.values(peons).filter(
     (p) => p.state === 'working' && resolveBuilding(p.currentTool, undefined, mapping) === buildingId,
   );
-  const workingNow = workerHeroes.length + workerPeons.length;
+  const presentNow = presentHeroes.length + presentPeons.length;
 
   // "What happened here" list: latest actions from ALL heroes filtered to this
   // building (from recentActions buffer), newest first.
@@ -75,8 +75,8 @@ export function BuildingPanel() {
           <strong className="px" style={{ fontSize: 15, color: '#fac775' }}>{bt.label}</strong>
           <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>{bt.desc}</div>
           <div style={{ fontSize: 11, opacity: 0.65, marginTop: 4 }}>
-            {t.workingNow}: <b>{workingNow}</b>
-            {workingNow > 0 ? ` (${workerHeroes.length} ${t.sessions}, ${workerPeons.length} ${t.peons})` : ''}
+            {t.workingNow}: <b>{presentNow}</b>
+            {presentNow > 0 ? ` (${presentHeroes.length} ${t.sessions}, ${presentPeons.length} ${t.peons})` : ''}
           </div>
         </div>
         <button className="ghost" onClick={() => select(undefined)}>
@@ -84,14 +84,14 @@ export function BuildingPanel() {
         </button>
       </div>
 
-      {workingNow > 0 && (
+      {presentNow > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, fontSize: 12 }}>
-          {workerHeroes.map((h) => (
+          {presentHeroes.map((h) => (
             <div key={h.sessionId} className="line assistant" style={{ alignSelf: 'stretch', maxWidth: '100%' }}>
               🦸 {clip(h.title, 40)} · {h.toolDetail ? clip(h.toolDetail, 30) : h.currentTool ?? h.state}
             </div>
           ))}
-          {workerPeons.map((p) => (
+          {presentPeons.map((p) => (
             <div key={p.agentId} className="line assistant" style={{ alignSelf: 'stretch', maxWidth: '100%' }}>
               ⛏️ {clip(p.description ?? 'peon', 40)}
             </div>

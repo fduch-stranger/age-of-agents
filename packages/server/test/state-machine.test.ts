@@ -30,7 +30,7 @@ describe('SessionTracker', () => {
     expect(world.getHero('session-1')?.state).toBe('awaiting-input');
   });
 
-  it('turn-end completes the mission and sends the hero to the citadel', () => {
+  it('turn-end completes the mission and sends the hero to returning state', () => {
     const { world, events, tracker } = setup();
     tracker.apply({ kind: 'prompt', text: 'Zadanie', ts: '2026-06-13T10:00:00.000Z' });
     tracker.apply({ kind: 'turn-end', ts: '2026-06-13T10:01:00.000Z' });
@@ -38,6 +38,16 @@ describe('SessionTracker', () => {
     expect(world.getHero('session-1')?.state).toBe('returning');
     const done = events.find((e) => e.type === 'mission-completed');
     expect(done && done.type === 'mission-completed' && done.mission.status).toBe('completed');
+  });
+
+  it('turn-aborted sends the hero to recovery and fails the active mission', () => {
+    const { world, events, tracker } = setup();
+    tracker.apply({ kind: 'prompt', text: 'Zadanie', ts: '2026-06-13T10:00:00.000Z' });
+    tracker.apply({ kind: 'turn-aborted', ts: '2026-06-13T10:01:00.000Z' });
+
+    expect(world.getHero('session-1')?.state).toBe('recovering');
+    const done = events.find((e) => e.type === 'mission-completed');
+    expect(done && done.type === 'mission-completed' && done.mission.status).toBe('failed');
   });
 
   it('odpowiedź (tool-result sukces) gasi awaiting-input nawet bez bloku thinking', () => {

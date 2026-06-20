@@ -23,6 +23,7 @@ export type Fact =
       last?: { input: number; output: number; cachedInput?: number; reasoningOutput?: number };
     }
   | { kind: 'turn-end'; ts: string }
+  | { kind: 'turn-aborted'; ts: string }
   | { kind: 'tool-result'; isError: boolean; ts: string }
   | { kind: 'attribution'; skill?: string; plugin?: string; mcpServer?: string }
   | { kind: 'cleared'; ts: string }

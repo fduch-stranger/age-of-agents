@@ -24,6 +24,7 @@ const STATE_STYLE: Record<HeroStateKind, { color: string; emoji: string }> = {
   thinking: { color: '#85b7eb', emoji: '💭' },
   'awaiting-input': { color: '#ef9f27', emoji: '✋' },
   error: { color: '#f09595', emoji: '⚠️' },
+  recovering: { color: '#e48aa2', emoji: '⚕️' },
   idle: { color: '#b4b2a9', emoji: '⏸️' },
   sleeping: { color: '#888780', emoji: '💤' },
   returning: { color: '#97c459', emoji: '🚶' },

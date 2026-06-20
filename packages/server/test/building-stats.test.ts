@@ -138,6 +138,41 @@ describe('computeBuildingStats - Codex rollout records', () => {
     expect(res.buildings.forge?.today).toBe(50);
   });
 
+  it('extracts detail from split namespaced Codex tool records for custom attribution', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          namespace: 'web',
+          name: 'run',
+          arguments: JSON.stringify({ search_query: [{ q: 'rust async' }] }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+    ]);
+    const config: MappingConfig = {
+      rules: [
+        { kind: 'detail', tool: 'WebSearch', pattern: 'rust async', building: 'market' },
+        { kind: 'exact', tool: 'WebSearch', building: 'tower' },
+      ],
+      fallback: 'citadel',
+    };
+
+    const res = await computeBuildingStats(root, NOW + 2000, config);
+    expect(res.buildings.market?.today).toBe(40);
+    expect(res.buildings.tower).toBeUndefined();
+  });
+
   it('does not create Codex output deltas from compacted token_count repeats', async () => {
     invalidateBuildingStatsCache();
     const root = rootWithCodexRecords([
@@ -209,9 +244,116 @@ describe('computeBuildingStats - Codex rollout records', () => {
     ]);
 
     const res = await computeBuildingStats(root, NOW + 2000);
-    expect(res.buildings.mine?.today).toBe(40);
-    expect(res.buildings.garden?.today).toBe(50);
-    expect(res.buildings.hydroponics?.today).toBe(50);
+    expect(res.buildings.mine).toBeUndefined();
+    expect(res.buildings.garden?.today).toBe(90);
+    expect(res.buildings.hydroponics?.today).toBe(90);
+  });
+
+  it('credits a final Codex token_count before task completion to theme resting buildings', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: { type: 'task_complete' },
+      },
+    ]);
+
+    const res = await computeBuildingStats(root, NOW + 2000);
+    expect(res.buildings.mine).toBeUndefined();
+    expect(res.buildings.garden?.today).toBe(40);
+    expect(res.buildings.hydroponics?.today).toBe(40);
+  });
+
+  it('credits Codex aborted turns to theme recovery buildings', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: { type: 'turn_aborted' },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1200, output_tokens: 90 } },
+        },
+      },
+    ]);
+
+    const res = await computeBuildingStats(root, NOW + 2000);
+    expect(res.buildings.mine).toBeUndefined();
+    expect(res.buildings.shrine?.today).toBe(90);
+    expect(res.buildings.medbay?.today).toBe(90);
+  });
+
+  it('credits a final Codex token_count before turn abort to theme recovery buildings', async () => {
+    invalidateBuildingStatsCache();
+    const root = rootWithCodexRecords([
+      {
+        type: 'response_item',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'function_call',
+          name: 'exec_command',
+          arguments: JSON.stringify({ cmd: 'npm test' }),
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW).toISOString(),
+        payload: {
+          type: 'token_count',
+          info: { total_token_usage: { input_tokens: 1000, output_tokens: 40 } },
+        },
+      },
+      {
+        type: 'event_msg',
+        timestamp: new Date(NOW + 1000).toISOString(),
+        payload: { type: 'turn_aborted' },
+      },
+    ]);
+
+    const res = await computeBuildingStats(root, NOW + 2000);
+    expect(res.buildings.mine).toBeUndefined();
+    expect(res.buildings.shrine?.today).toBe(40);
+    expect(res.buildings.medbay?.today).toBe(40);
   });
 });
 

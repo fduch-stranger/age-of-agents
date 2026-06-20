@@ -78,6 +78,22 @@ describe('interpretCodexLine', () => {
       ts: '2026-06-20T12:00:10.084Z',
     });
 
+    const stdin = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T12:00:12.000Z',
+      payload: {
+        type: 'function_call',
+        name: 'write_stdin',
+        call_id: 'call-stdin',
+        arguments: JSON.stringify({ session_id: 123, chars: 'y\n' }),
+      },
+    }));
+    expect(stdin.find((f) => f.kind === 'tool-start')).toMatchObject({
+      kind: 'tool-start',
+      tool: 'Bash',
+      messageId: 'call-stdin',
+    });
+
     const js = interpretCodexLine(line({
       type: 'response_item',
       timestamp: '2026-06-20T12:00:25.638Z',
@@ -110,6 +126,109 @@ describe('interpretCodexLine', () => {
       kind: 'tool-start',
       tool: 'Workflow',
       detail: 'Inspect',
+    });
+
+    const goal = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T12:00:30.000Z',
+      payload: {
+        type: 'function_call',
+        name: 'update_goal',
+        call_id: 'call-goal',
+        arguments: JSON.stringify({ status: 'complete' }),
+      },
+    }));
+    expect(goal.find((f) => f.kind === 'tool-start')).toMatchObject({
+      kind: 'tool-start',
+      tool: 'Workflow',
+      messageId: 'call-goal',
+    });
+
+    const resource = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T12:00:31.000Z',
+      payload: {
+        type: 'function_call',
+        name: 'read_mcp_resource',
+        call_id: 'call-resource',
+        arguments: JSON.stringify({ server: 'serena', uri: 'memory://project' }),
+      },
+    }));
+    expect(resource.find((f) => f.kind === 'tool-start')).toMatchObject({
+      kind: 'tool-start',
+      tool: 'Read',
+      messageId: 'call-resource',
+    });
+  });
+
+  it('namespaced Codex function_call records keep their namespace for attribution', () => {
+    const serena = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T15:38:07.743Z',
+      payload: {
+        type: 'function_call',
+        name: 'initial_instructions',
+        namespace: 'mcp__serena',
+        call_id: 'call-serena',
+        arguments: '{}',
+      },
+    }));
+    expect(serena).toContainEqual({
+      kind: 'tool-start',
+      tool: 'mcp__serena__initial_instructions',
+      messageId: 'call-serena',
+      ts: '2026-06-20T15:38:07.743Z',
+    });
+
+    const wait = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T07:37:40.903Z',
+      payload: {
+        type: 'function_call',
+        name: 'wait_agent',
+        namespace: 'multi_agent_v1',
+        call_id: 'call-wait',
+        arguments: JSON.stringify({ targets: ['agent-1'], timeout_ms: 600000 }),
+      },
+    }));
+    expect(wait.find((f) => f.kind === 'tool-start')).toMatchObject({
+      kind: 'tool-start',
+      tool: 'mcp__multi_agent_v1__wait_agent',
+      messageId: 'call-wait',
+    });
+
+    const spawn = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T07:37:41.000Z',
+      payload: {
+        type: 'function_call',
+        name: 'spawn_agent',
+        namespace: 'multi_agent_v1',
+        call_id: 'call-spawn',
+        arguments: JSON.stringify({ message: 'Inspect parser behavior' }),
+      },
+    }));
+    expect(spawn.find((f) => f.kind === 'tool-start')).toMatchObject({
+      kind: 'tool-start',
+      tool: 'Workflow',
+      messageId: 'call-spawn',
+    });
+
+    const close = interpretCodexLine(line({
+      type: 'response_item',
+      timestamp: '2026-06-20T07:37:42.000Z',
+      payload: {
+        type: 'function_call',
+        name: 'close_agent',
+        namespace: 'multi_agent_v1',
+        call_id: 'call-close',
+        arguments: JSON.stringify({ target: 'agent-1' }),
+      },
+    }));
+    expect(close.find((f) => f.kind === 'tool-start')).toMatchObject({
+      kind: 'tool-start',
+      tool: 'mcp__multi_agent_v1__close_agent',
+      messageId: 'call-close',
     });
   });
 
@@ -273,6 +392,20 @@ describe('interpretCodexLine', () => {
     expect(interpretCodexLine(line({ type: 'response_item', payload: { type: 'function_call_output', output: { exit_code: 0 } } }))).toContainEqual({ kind: 'tool-result', isError: false, ts: expect.any(String) });
     expect(interpretCodexLine(line({ type: 'totally_unknown' }))).toEqual([]);
   });
+
+  it('Codex lifecycle events update semantic session state', () => {
+    expect(interpretCodexLine(line({
+      type: 'event_msg',
+      timestamp: '2026-06-20T19:00:00.000Z',
+      payload: { type: 'task_started', turn_id: 'turn-1' },
+    }))).toContainEqual({ kind: 'thinking', ts: '2026-06-20T19:00:00.000Z' });
+
+    expect(interpretCodexLine(line({
+      type: 'event_msg',
+      timestamp: '2026-06-20T19:01:00.000Z',
+      payload: { type: 'turn_aborted', reason: 'interrupted' },
+    }))).toContainEqual({ kind: 'turn-aborted', ts: '2026-06-20T19:01:00.000Z' });
+  });
 });
 
 describe('helpers (tuning points)', () => {
@@ -290,10 +423,15 @@ describe('helpers (tuning points)', () => {
   });
   it('codexToolToCanonical: maps dotted Codex-local tools before MCP fallback', () => {
     expect(codexToolToCanonical('functions.write_stdin')).toBe('Bash');
+    expect(codexToolToCanonical('write_stdin')).toBe('Bash');
+    expect(codexToolToCanonical('request_user_input')).toBe('AskUserQuestion');
     expect(codexToolToCanonical('functions.request_user_input')).toBe('AskUserQuestion');
     expect(codexToolToCanonical('functions.view_image')).toBe('Read');
     expect(codexToolToCanonical('functions.apply_patch')).toBe('Edit');
     expect(codexToolToCanonical('web.run')).toBe('WebSearch');
+    expect(codexToolToCanonical('update_goal')).toBe('Workflow');
+    expect(codexToolToCanonical('create_goal')).toBe('Workflow');
+    expect(codexToolToCanonical('get_goal')).toBe('Workflow');
     expect(codexToolToCanonical('functions.update_goal')).toBe('Workflow');
     expect(codexToolToCanonical('functions.create_goal')).toBe('Workflow');
     expect(codexToolToCanonical('functions.get_goal')).toBe('Workflow');
@@ -301,7 +439,17 @@ describe('helpers (tuning points)', () => {
     expect(codexToolToCanonical('multi_tool_use.parallel')).toBe('Workflow');
     expect(codexToolToCanonical('tool_search.tool_search_tool')).toBe('ToolSearch');
     expect(codexToolToCanonical('image_gen.imagegen')).toBe('Edit');
+    expect(codexToolToCanonical('list_mcp_resources')).toBe('ToolSearch');
+    expect(codexToolToCanonical('list_mcp_resource_templates')).toBe('ToolSearch');
+    expect(codexToolToCanonical('read_mcp_resource')).toBe('Read');
+    expect(codexToolToCanonical('list_mcp_resources', 'functions')).toBe('ToolSearch');
+    expect(codexToolToCanonical('list_mcp_resource_templates', 'functions')).toBe('ToolSearch');
+    expect(codexToolToCanonical('read_mcp_resource', 'functions')).toBe('Read');
     expect(codexToolToCanonical('mcp__server__tool')).toBe('mcp__server__tool');
+    expect(codexToolToCanonical('wait_agent', 'multi_agent_v1')).toBe('mcp__multi_agent_v1__wait_agent');
+    expect(codexToolToCanonical('send_input', 'multi_agent_v1')).toBe('mcp__multi_agent_v1__send_input');
+    expect(codexToolToCanonical('close_agent', 'multi_agent_v1')).toBe('mcp__multi_agent_v1__close_agent');
+    expect(codexToolToCanonical('spawn_agent', 'multi_agent_v1')).toBe('Workflow');
   });
 });
 

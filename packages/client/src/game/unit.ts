@@ -178,8 +178,8 @@ export class Unit {
   setState(state: HeroStateKind, bubbleText?: string): void {
     this.state = state;
     this.aura.visible = state === 'thinking';
-    this.overlay.text = state === 'awaiting-input' ? '!' : state === 'error' ? '✶' : state === 'sleeping' ? 'zzz' : '';
-    this.overlay.style.fill = state === 'awaiting-input' ? 0xfac775 : state === 'error' ? 0xe24b4a : 0xb4b2a9;
+    this.overlay.text = state === 'awaiting-input' ? '!' : state === 'error' ? '✶' : state === 'recovering' ? '+' : state === 'sleeping' ? 'zzz' : '';
+    this.overlay.style.fill = state === 'awaiting-input' ? 0xfac775 : state === 'error' ? 0xe24b4a : state === 'recovering' ? 0xe06080 : 0xb4b2a9;
     const newBubble = bubbleText ? clip(bubbleText, 34) : '';
     if (newBubble !== this.bubble.text) {
       this.bubble.text = newBubble;

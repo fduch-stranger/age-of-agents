@@ -11,6 +11,7 @@ const STATE_ICON: Record<HeroStateKind, string> = {
   thinking: '💭',
   'awaiting-input': '✋',
   error: '⚠️',
+  recovering: '⚕️',
   idle: '⏸️',
   sleeping: '💤',
   returning: '🚶',
