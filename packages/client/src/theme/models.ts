@@ -1,6 +1,6 @@
 /**
- * Re-eksport rejestru modeli z shared (bliźniak theme/mapping.ts). Trzyma importy
- * klienta przy jednej ścieżce '../theme/models'.
+ * Re-export the model registry from shared (twin of theme/mapping.ts). Keeps
+ * client imports on one path, '../theme/models'.
  */
 export {
   SPRITE_IDS,

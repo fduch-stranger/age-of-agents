@@ -3,29 +3,28 @@ import type { HeroSnapshot } from '@agent-citadel/shared';
 import type { ThemeDef } from '../theme/types';
 
 /**
- * Punti di raccolta (3 per tema) in cui una nuova sessione spawna
- * prima di essere mandata a lavorare. Scelti da un hash STABILE del
- * nome del progetto, così le sessioni dello stesso progetto si
- * raggruppano nello stesso punto, e progetti diversi si distribuiscono
- * sulla mappa invece di ammucchiarsi davanti alla citadella.
+ * Gathering points where a new session spawns before being sent to work. Chosen
+ * from a STABLE hash of the project name, so sessions from the same project
+ * cluster at the same point, while different projects distribute across the map
+ * instead of piling up in front of the citadel.
  *
- * I 3 building per tema sono ordinati così che ognuno "ospiti" un
- * sottoinsieme diverso di progetti (hash % 3) — la suddivisione è
- * deterministica e non dipende dall'ordine di arrivo.
+ * The buildings per theme are ordered so each "hosts" a different subset of
+ * projects (hash % count). The split is deterministic and does not depend on
+ * arrival order.
  */
 const HOME_BUILDINGS: Record<string, BuildingId[]> = {
   fantasy: ['arena', 'tavern', 'garden', 'bar', 'shrine'],
   scifi: ['holodeck', 'mess', 'hydroponics', 'lounge', 'medbay'],
 };
 
-/** Budynek „poczekalni", do którego idzie bohater czekający na usera (awaiting-input).
- *  fantasy: kaplica (shrine); sci-fi: poczekalnia (lounge); fallback: citadel. */
+/** "Waiting room" building where a hero awaiting user input goes (awaiting-input).
+ *  fantasy: chapel (shrine); sci-fi: waiting room (lounge); fallback: citadel. */
 const AWAITING_BY_THEME: Record<string, BuildingId> = { fantasy: 'shrine', scifi: 'lounge' };
 export function awaitingBuilding(themeId: string): BuildingId {
   return AWAITING_BY_THEME[themeId] ?? 'citadel';
 }
 
-/** djb2 — veloce, deterministico, sufficiente per spalmare 100+ progetti. */
+/** djb2: fast, deterministic, sufficient to spread 100+ projects. */
 function projectHash(s: string): number {
   let h = 5381;
   for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
@@ -33,16 +32,16 @@ function projectHash(s: string): number {
 }
 
 /**
- * Restituisce l'id del building in cui una NUOVA unità di questa sessione
- * dovrebbe apparire. Se il tema non ha punti di raccolta o manca il progetto,
- * fallback alla citadella (la destinazione originale).
+ * Returns the building id where a NEW unit for this session should appear. If
+ * the theme has no gathering points or the project is missing, fall back to the
+ * citadel (the original destination).
  */
 export function homeBuilding(theme: ThemeDef, hero: Pick<HeroSnapshot, 'projectName' | 'projectDir'>): BuildingId {
   const options = HOME_BUILDINGS[theme.id];
   if (!options || options.length === 0) return 'citadel';
-  // Preferiamo projectName (più corto e stabile di un path assoluto), ma
-  // se manca usiamo projectDir come fallback. Entrambi portano alla stessa
-  // destinazione se lo stesso progetto si presenta più volte.
+  // Prefer projectName (shorter and more stable than an absolute path), but use
+  // projectDir as fallback when missing. Both lead to the same destination if
+  // the same project appears multiple times.
   const key = hero.projectName ?? hero.projectDir ?? '';
   if (!key) return 'citadel';
   return options[projectHash(key) % options.length];
