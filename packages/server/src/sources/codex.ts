@@ -19,13 +19,13 @@ function codexDateRoot(base: string, date: Date): string {
 }
 
 /* ─────────────────────────────────────────────────────────────────
- * PUNKT DOSTROJENIA 1 — heurystyka „prawdziwy prompt vs. wstrzyknięcia".
- * Codex wstrzykuje jako rolę 'user': AGENTS.md, <environment_context>,
- * instrukcje permissions itp. Konserwatywnie: tylko rola 'user' i bez
- * jawnych markerów systemowych. Dostrój listę pod swoje sesje.
+ * TUNING POINT 1: heuristic for "real prompt vs. injections".
+ * Codex injects as role 'user': AGENTS.md, <environment_context>,
+ * permission instructions, etc. Conservatively: only role 'user' and no
+ * explicit system markers. Tune this list for your sessions.
  * ───────────────────────────────────────────────────────────────── */
 export function isCodexHumanPrompt(text: string, role: string | undefined): boolean {
-  if (role !== 'user') return false; // 'developer'/'system' to nie prompty człowieka
+  if (role !== 'user') return false; // 'developer'/'system' are not human prompts
   const t = text.trim();
   if (!t) return false;
   if (t.startsWith('<')) return false; // <environment_context>, <permissions…>, <INSTRUCTIONS>
@@ -35,9 +35,9 @@ export function isCodexHumanPrompt(text: string, role: string | undefined): bool
 }
 
 /* ─────────────────────────────────────────────────────────────────
- * PUNKT DOSTROJENIA 2 — narzędzie Codeksa → nazwa kanoniczna gry.
- * Nazwa kanoniczna trafia do toolToBuilding (shared), więc steruje tym,
- * do którego budynku maszeruje jednostka. To serce metafory dla Codeksa.
+ * TUNING POINT 2: Codex tool -> canonical game name.
+ * The canonical name flows into toolToBuilding (shared), so it controls which
+ * building the unit walks to. This is the heart of the Codex metaphor.
  * ───────────────────────────────────────────────────────────────── */
 export function codexToolToCanonical(name: string): string {
   switch (name) {
@@ -46,23 +46,23 @@ export function codexToolToCanonical(name: string): string {
     case 'exec':
       return 'Bash'; // kopalnia (git w argumentach → targ, jak u Claude)
     case 'apply_patch':
-      return 'Edit'; // kuźnia
+      return 'Edit'; // forge
     case 'read_file':
     case 'view_image':
       return 'Read'; // biblioteka
     case 'web_search':
-      return 'WebSearch'; // wieża
+      return 'WebSearch'; // tower
     case 'update_plan':
-      return 'update_plan'; // brak mapowania → twierdza
+      return 'update_plan'; // no mapping -> citadel
     default:
-      // Narzędzia MCP Codeksa: 'serwer__narzędzie' albo 'serwer.narzędzie'.
+      // Codex MCP tools: 'server__tool' or 'server.tool'.
       if (name.includes('__')) return `mcp__${name}`;
       if (name.includes('.')) return `mcp__${name.replace(/\./g, '__')}`;
       return name; // nieznane → twierdza (fallback w toolToBuilding)
   }
 }
 
-/** Detal do dymka z argumentów function_call (analog toolDetail Claude). */
+/** Bubble detail from function_call arguments (Claude toolDetail analog). */
 function codexToolDetail(name: string, argumentsRaw: unknown): string | undefined {
   let args: any;
   if (typeof argumentsRaw === 'string') {
@@ -78,7 +78,7 @@ function codexToolDetail(name: string, argumentsRaw: unknown): string | undefine
   }
   if (name === 'shell' || name === 'local_shell' || name === 'exec') {
     const cmd = Array.isArray(args.command) ? args.command.join(' ') : str(args.command);
-    // pomiń typowy wrapper 'bash -lc' aby pokazać sedno komendy
+    // skip typical 'bash -lc' wrapper to show the command essence
     return cmd ? clip(cmd.replace(/^bash\s+-lc\s+/, ''), 60) : undefined;
   }
   if (name === 'web_search') return str(args.query);
@@ -90,7 +90,7 @@ function codexToolDetail(name: string, argumentsRaw: unknown): string | undefine
   return str(args.path) ?? str(args.file_path);
 }
 
-/** Czy wynik function_call wskazuje błąd (best-effort — formaty się różnią). */
+/** Whether function_call result indicates an error (best-effort; formats differ). */
 function codexOutputIsError(output: unknown): boolean {
   if (output && typeof output === 'object') {
     const o = output as any;
@@ -100,7 +100,7 @@ function codexOutputIsError(output: unknown): boolean {
   return false;
 }
 
-/** Wyciąga kumulatywne użycie tokenów z payloadu token_count (kilka kształtów). */
+/** Extracts cumulative token usage from token_count payload (several shapes). */
 function extractCodexUsage(payload: any): { input: number; output: number } | undefined {
   const u = payload?.info?.total_token_usage ?? payload?.total_token_usage ?? payload;
   if (!u || typeof u !== 'object') return undefined;
@@ -125,8 +125,8 @@ function handleMessage(payload: any, ts: string, facts: Fact[]): void {
 }
 
 /**
- * Parsuje jedną linię rolloutu Codeksa → Fakty. Nieznany/uszkodzony rekord → [].
- * Format zmienia się między wersjami CLI — czytamy defensywnie.
+ * Parses one Codex rollout line -> Facts. Unknown/broken record -> [].
+ * Format changes between CLI versions: read defensively.
  */
 export function interpretCodexLine(line: string): Fact[] {
   let record: any;
@@ -213,8 +213,8 @@ export function interpretCodexLine(line: string): Fact[] {
 }
 
 /**
- * Źródło Codex: ~/.codex/sessions/RRRR/MM/DD/rollout-<ts>-<uuid>.jsonl.
- * Ścieżka koduje DATĘ, nie projekt — projectName bierze się z cwd w session_meta.
+ * Codex source: ~/.codex/sessions/YYYY/MM/DD/rollout-<ts>-<uuid>.jsonl.
+ * Path encodes DATE, not project; projectName comes from cwd in session_meta.
  */
 export function codexSessionRoots(
   base = join(homedir(), '.codex', 'sessions'),

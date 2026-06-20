@@ -8,17 +8,17 @@ import type { AgentSource, ClassifiedFile } from './sources/types.js';
 import type { World } from './world.js';
 
 /**
- * Czy sesja jest „żywa" przy starcie serwera. Okno = removeAfterMs (z progów):
- * tworzymy bohatera tylko dla sesji, której maszyna stanów i tak by od razu nie
- * usunęła. Dzięki temu sesje w toku, ale chwilowo ciche (czekają na input, autor
- * odszedł na chwilę), pojawiają się od razu, a stare nie migoczą (nie powstają
- * tylko po to, by zniknąć na pierwszym sweepie). Wcześniej sztywne 10 min gubiło
- * trwające sesje, które przez moment nic nie dopisały do transkryptu.
+ * Whether a session is "live" at server startup. Window = removeAfterMs (from
+ * thresholds): create a hero only for a session whose state machine would not
+ * immediately remove it. Sessions in progress but briefly quiet (waiting for
+ * input, author stepped away) appear immediately, while old ones do not flicker
+ * (created only to vanish on first sweep). Earlier fixed 10 min lost sessions
+ * that briefly wrote nothing to the transcript.
  */
 export function isLiveAtStartup(mtimeMs: number, nowMs: number, windowMs: number): boolean {
   return mtimeMs > nowMs - windowMs;
 }
-/** Większe pliki tail-ujemy od końca zamiast odtwarzać całą historię. */
+/** Tail larger files from the end instead of replaying full history. */
 const REPLAY_MAX_BYTES = 2 * 1024 * 1024;
 const SWEEP_INTERVAL_MS = 15_000;
 const META_SCAN_BYTES = 64 * 1024;
@@ -35,9 +35,9 @@ interface SubagentTarget {
 }
 
 /**
- * Obserwuje korzeń(e) jednego źródła (Claude/Codex): główne transkrypty sesji
- * (bohaterowie) i — jeśli źródło je rozpoznaje — subagentów (peony).
- * Cała wiedza o lokalizacji i formacie pochodzi z AgentSource.
+ * Watches roots of one source (Claude/Codex): main session transcripts (heroes)
+ * and, if the source recognizes them, subagents (peons). All location/format
+ * knowledge comes from AgentSource.
  */
 export class SourceWatcher {
   private tails = new TailRegistry();
@@ -73,8 +73,8 @@ export class SourceWatcher {
       alwaysStat: true,
       usePolling: true,
       interval: 1_000,
-      // Ignorujemy tylko POTWIERDZONE pliki bez .jsonl (bez stats nie wolno —
-      // ucięlibyśmy traversal drzewa).
+      // Ignore only CONFIRMED non-.jsonl files (without stats we must not:
+      // would cut off tree traversal).
       ignored: (path, stats) => stats?.isFile() === true && !path.endsWith('.jsonl'),
     });
     const enqueue = (path: string, stats?: { mtimeMs?: number; size?: number }, initial = false) => {
@@ -93,7 +93,7 @@ export class SourceWatcher {
     await this.watcher?.close();
   }
 
-  /** Szybki kanał: fakty z hooków HTTP trafiają do tej samej maszyny stanów. */
+  /** Fast channel: facts from HTTP hooks go to the same state machine. */
   applyExternalFacts(sessionId: string, projectDir: string, facts: import('./transcript/facts.js').Fact[]): void {
     let tracker = this.trackers.get(sessionId);
     if (!tracker) {
@@ -133,7 +133,7 @@ export class SourceWatcher {
 
     if (!this.tails.has(path)) {
       const fresh = !initial || isLiveAtStartup(stats?.mtimeMs ?? 0, Date.now(), this.thresholds.removeAfterMs);
-      if (!fresh) return; // stara sesja — obudzi się przy zdarzeniu 'change'
+      if (!fresh) return; // old session: wakes up on a 'change' event
       if ((stats?.size ?? 0) > REPLAY_MAX_BYTES) {
         if (target.kind === 'session') await this.scanSessionMetadata(path);
         await this.tails.registerAtEnd(path);

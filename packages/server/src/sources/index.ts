@@ -5,12 +5,12 @@ import { kodaSource } from './koda.js';
 import { filterSources } from './config.js';
 import type { AgentSource } from './types.js';
 
-/** Wszystkie znane źródła agentów. */
+/** All known agent sources. */
 export const ALL_SOURCES: AgentSource[] = [claudeSource, codexSource, opencodeSource, kodaSource];
 
 export function activeSources(raw = process.env.AOA_SOURCES): AgentSource[] {
   return filterSources(ALL_SOURCES, raw);
 }
 
-/** Wszystkie aktywne źródła agentów dla domyślnego środowiska. */
+/** All active agent sources for the default environment. */
 export const SOURCES: AgentSource[] = activeSources();

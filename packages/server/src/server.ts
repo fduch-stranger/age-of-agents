@@ -9,10 +9,10 @@ import { ArsenalPoller } from './arsenal/arsenal-poller.js';
 import type { SourceWatcher } from './watcher.js';
 
 export interface StartServerOptions {
-  /** Port HTTP. Podaj 0, by system wybrał wolny (przydatne w testach). */
+  /** HTTP port. Pass 0 so the system picks a free one (useful in tests). */
   port: number;
   host?: string;
-  /** Tryb demo: sztuczne dane zamiast podglądu ~/.claude/projects. */
+  /** Demo mode: synthetic data instead of watching ~/.claude/projects. */
   demo: boolean;
   /** Katalog ze zbudowanym klientem (dist/web). Gdy podany — serwer serwuje SPA. */
   webRoot?: string;
@@ -35,11 +35,11 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   app.get('/health', async () => ({ ok: true, demo: opts.demo }));
 
   if (opts.demo) {
-    // No-op trasy, by zainstalowane hooki nie sypały 404 w trybie demo.
+    // No-op routes so installed hooks do not emit 404s in demo mode.
     app.post('/hooks', async () => ({ ok: true }));
     app.get('/hooks/status', async () => ({ installed: false, demo: true }));
     app.get('/building-stats', async () => ({ updatedAt: new Date().toISOString(), buildings: {} }));
-    // Mapa narzędzie→budynek: w demo nie persystujemy (PUT tylko waliduje, GET = domyślna).
+    // Tool->building map: demo does not persist (PUT only validates, GET = default).
     registerMappingRoutes(app, { persist: false });
     registerModelRoutes(app, { persist: false });
   } else {
@@ -49,16 +49,16 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     const { getBuildingStats, invalidateBuildingStatsCache } = await import('./building-stats.js');
     const sources = activeSources(process.env.AOA_SOURCES);
     watchers = sources.map((source) => new SourceWatcher(world, source));
-    // Hooki HTTP są kanałem Claude → kierujemy je do watchera Claude.
+    // HTTP hooks are the Claude channel; route them to the Claude watcher.
     const claudeWatcher = watchers.find((w) => w.id === 'claude');
     
-    // OpenCode używa SQLite zamiast JSONL - uruchom poller
+    // OpenCode uses SQLite instead of JSONL: start poller.
     const opencodeEnabled = sources.some((source) => source.id === 'opencode');
     opencodePoller = opencodeEnabled ? new OpenCodePoller(world) : undefined;
 
     app.get('/building-stats', async () => getBuildingStats());
-    // Mapa narzędzie→budynek: lokalny serwer = źródło prawdy (plik na dysku usera);
-    // zapis invaliduje cache statystyk, by liczby nadążały za nową mapą.
+    // Tool->building map: local server = source of truth (file on user's disk);
+    // saving invalidates stats cache so numbers keep up with the new map.
     registerMappingRoutes(app, { persist: true, onSaved: invalidateBuildingStatsCache });
     registerModelRoutes(app, { persist: true });
     app.post('/hooks', async (request, reply) => {
@@ -82,7 +82,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     app.addHook('onReady', async () => {
       for (const w of watchers) w.start();
       await opencodePoller?.start();
-      // `arsenal-updated` event do klienta (panel Arsenału).
+      // `arsenal-updated` event to client (Arsenal panel).
       arsenalPoller = new ArsenalPoller(world);
       arsenalPoller.start();
       app.log.info(`Source watchers active: ${watchers.map((w) => w.id).join(', ')}`);
@@ -93,8 +93,8 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
   if (opts.webRoot) {
     const fastifyStatic = (await import('@fastify/static')).default;
     await app.register(fastifyStatic, { root: opts.webRoot, wildcard: false });
-    // SPA fallback: nieznana trasa GET → index.html (trasy API są zarejestrowane,
-    // więc tu nie trafią).
+    // SPA fallback: unknown GET route -> index.html (API routes are registered,
+    // so they will not land here).
     app.setNotFoundHandler((req, reply) => {
       if (req.method === 'GET') return reply.sendFile('index.html');
       reply.code(404).send({ error: 'not found' });
@@ -110,8 +110,8 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
 
   const send = (socket: WebSocket, event: GameEvent): void => {
     if (socket.readyState !== WebSocket.OPEN) return;
-    // Klient mógł zniknąć w trakcie broadcastu — jego awaria nie może przerwać
-    // dostawy do pozostałych.
+    // Client may disappear during broadcast; its failure must not interrupt
+    // delivery to the others.
     try {
       socket.send(JSON.stringify(event));
     } catch (err) {

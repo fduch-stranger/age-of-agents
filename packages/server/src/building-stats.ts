@@ -12,17 +12,17 @@ import {
 import { loadMappingConfig } from './mapping-config.js';
 
 /**
- * Zużycie tokenów per budynek w oknach dzień/tydzień/30 dni.
+ * Token usage per building for day/week/30-day windows.
  *
- * Dane historyczne NIE istnieją w pamięci (watcher widzi tylko żywe sesje),
- * więc skanujemy transkrypty ~/.claude/projects: każdej wiadomości assistant
- * przypisujemy tokeny WYJŚCIOWE do budynku narzędzia, którego użyła
- * (toolToBuilding), z podziałem równym gdy dotknęła kilku budynków. Wiadomość
- * bez narzędzia (samo rozumowanie/tekst) przypisujemy do budynku, przy którym
- * sesja AKTUALNIE pracuje (ostatnie użyte narzędzie) — inaczej Twierdza
- * (fallback) pożarłaby większość tokenów. Wynik jest cache'owany.
+ * Historical data does NOT exist in memory (watcher sees only live sessions), so
+ * scan transcripts under ~/.claude/projects: assign each assistant message's
+ * OUTPUT tokens to the building of the tool it used (toolToBuilding), split
+ * evenly when it touched multiple buildings. A message without a tool (reasoning/
+ * text only) is assigned to the building where the session is CURRENTLY working
+ * (last used tool); otherwise Citadel (fallback) would swallow most tokens. The
+ * result is cached.
  *
- * WKŁAD USERA (learning): atrybucja (równy podział, rozumowanie→ostatni budynek,
+ * USER CONTRIBUTION (learning): attribution (even split, reasoning->last building,
  * fallback→citadel) i okna czasowe to decyzje do strojenia.
  */
 
@@ -38,13 +38,13 @@ interface Bucket {
 
 export interface MsgSample {
   ts: number; // epoch ms
-  output: number; // tokeny wyjściowe wiadomości
+  output: number; // message output tokens
   tools: { name: string; detail?: string }[];
 }
 
 /**
- * Czyste: dodaj jedną wiadomość assistant do akumulatora (tokeny→budynek, wg czasu).
- * `fallback` = budynek dla wiadomości bez narzędzia (budynek bieżącej pracy sesji).
+ * Pure: add one assistant message to the accumulator (tokens->building, by time).
+ * `fallback` = building for a message without a tool (current session work building).
  */
 export function accumulateMessage(
   acc: Map<BuildingId, Bucket>,
@@ -60,7 +60,7 @@ export function accumulateMessage(
 
   const buildings = msg.tools.length
     ? [...new Set(msg.tools.map((t) => resolveBuilding(t.name, t.detail, config)))]
-    : [fallback]; // samo rozumowanie → budynek bieżącej pracy sesji
+    : [fallback]; // reasoning only -> current session work building
   const share = msg.output / buildings.length;
 
   for (const b of buildings) {
@@ -72,7 +72,7 @@ export function accumulateMessage(
   }
 }
 
-/** Wyciąga próbkę z rekordu assistant (lub null gdy nieistotny). */
+/** Extracts a sample from an assistant record (or null when irrelevant). */
 function sampleFromRecord(rec: any): MsgSample | undefined {
   if (rec?.type !== 'assistant' || !rec.message) return undefined;
   const ts = Date.parse(rec.timestamp);
@@ -97,7 +97,7 @@ async function scanFile(
   config: MappingConfig,
 ): Promise<void> {
   const content = await readFile(path, 'utf8');
-  let current: BuildingId = 'citadel'; // budynek bieżącej pracy sesji (ostatnie narzędzie)
+  let current: BuildingId = 'citadel'; // current session work building (last tool)
   for (const line of content.split('\n')) {
     if (!line) continue;
     let rec: any;
@@ -138,10 +138,10 @@ export async function computeBuildingStats(
     const path = join(root, rel);
     try {
       const s = await stat(path);
-      if (now - s.mtimeMs > MONTH) continue; // plik bez zdarzeń w oknie 30 dni
+      if (now - s.mtimeMs > MONTH) continue; // file has no events in the 30-day window
       await scanFile(path, acc, now, dayStart, config);
     } catch {
-      /* pomiń nieczytelny plik */
+      /* skip unreadable file */
     }
   }
 
@@ -156,18 +156,18 @@ export async function computeBuildingStats(
   return { updatedAt: new Date(now).toISOString(), buildings };
 }
 
-// Cache: skan jest kosztowny (wiele sesji × 30 dni) → liczymy najwyżej raz/min.
+// Cache: scan is expensive (many sessions x 30 days), so compute at most once/min.
 let cache: { at: number; data: BuildingStatsResponse } | undefined;
 let inflight: Promise<BuildingStatsResponse> | undefined;
-// Licznik epok: inwalidacja go bije; przelot zapisuje cache TYLKO gdy epoka
-// nie zmieniła się od jego startu. Inaczej PUT w trakcie skanu utrwaliłby wynik
-// policzony STARYM configiem na cały TTL.
+// Epoch counter: invalidation bumps it; a pass writes cache ONLY when the epoch
+// has not changed since it started. Otherwise PUT during a scan would cache a
+// result computed with the OLD config for the entire TTL.
 let epoch = 0;
 
-/** Po edycji mapy (PUT /tool-mapping) zrzuć cache, żeby liczby nadążyły za nowym configiem. */
+/** After map edit (PUT /tool-mapping), drop cache so numbers catch up with the new config. */
 export function invalidateBuildingStatsCache(): void {
   cache = undefined;
-  inflight = undefined; // porzuć trwający przelot — jego wynik jest już nieświeży
+  inflight = undefined; // abandon in-flight pass; its result is already stale
   epoch++;
 }
 
@@ -181,7 +181,7 @@ export async function getBuildingStats(
   inflight = loadMappingConfig()
     .then((config) => computeBuildingStats(root, now, config))
     .then((data) => {
-      // Zapisz cache tylko, jeśli w międzyczasie nie unieważniono mapy.
+      // Save cache only if the map was not invalidated in the meantime.
       if (epoch === startEpoch) {
         cache = { at: Date.now(), data };
         inflight = undefined;

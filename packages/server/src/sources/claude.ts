@@ -5,8 +5,8 @@ import { rootIfExists } from './config.js';
 import type { AgentSource, ClassifiedFile } from './types.js';
 
 /**
- * Źródło Claude Code: ~/.claude/projects/<projekt>/<uuid>.jsonl (bohaterowie)
- * i <sesja>/subagents/**​/agent-<id>.jsonl (peony).
+ * Claude Code source: ~/.claude/projects/<project>/<uuid>.jsonl (heroes)
+ * and <session>/subagents/**​/agent-<id>.jsonl (peons).
  */
 export const claudeSource: AgentSource = {
   id: 'claude',

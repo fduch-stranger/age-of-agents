@@ -1,7 +1,7 @@
 /**
- * Fakt = znormalizowane zdarzenie semantyczne wyciągnięte z transkryptu
- * lub (w etapie 6) z hooka HTTP. Maszyna stanów konsumuje wyłącznie Fakty —
- * nie zna formatu JSONL, więc zmiany formatu CLI dotykają tylko parsera.
+ * Fact = normalized semantic event extracted from transcript or (in stage 6)
+ * from an HTTP hook. The state machine consumes only Facts; it does not know
+ * JSONL format, so CLI format changes touch only the parser.
  */
 export type Fact =
   | { kind: 'prompt'; text: string; ts: string }

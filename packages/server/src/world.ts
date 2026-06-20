@@ -9,9 +9,9 @@ import type {
 type Listener = (event: GameEvent) => void;
 
 /**
- * Stan świata w pamięci. Jedyne źródło prawdy po stronie serwera —
- * watcher, hooki i generator demo wszystkie mutują świat przez te metody,
- * a każda mutacja emituje zdarzenie do podłączonych klientów.
+ * In-memory world state. The only server-side source of truth: watcher, hooks,
+ * and demo generator all mutate the world through these methods, and every
+ * mutation emits an event to connected clients.
  */
 export class World {
   private heroes = new Map<string, HeroSnapshot>();
@@ -26,8 +26,8 @@ export class World {
   }
 
   private emit(event: GameEvent): void {
-    // Listener (np. broadcast WS na zerwanym sockecie) nie może ubić mutacji
-    // ani — przez sweep/connection — całego procesu. Izolujemy każdy z osobna.
+    // A listener (for example WS broadcast on a broken socket) must not kill the
+    // mutation or, through sweep/connection, the whole process. Isolate each one.
     for (const listener of this.listeners) {
       try {
         listener(event);
@@ -45,9 +45,8 @@ export class World {
     };
   }
 
-  /** Zwraca unikalne, aktywne katalogi projektów (w tej chwili pracujących sesji).
-   * Używane przez ArsenalPoller do wykrycia, dla których katalogów
-   * czytać konfigurację arsenału. */
+  /** Returns unique active project directories (currently working sessions).
+   * Used by ArsenalPoller to detect which directories should have arsenal config read. */
   activeProjectDirs(): string[] {
     const dirs = new Set<string>();
     for (const hero of this.heroes.values()) {
@@ -56,7 +55,7 @@ export class World {
     return [...dirs];
   }
 
-  /** Zwraca snapshot sesji należących do danego projektu. */
+  /** Returns a snapshot of sessions belonging to a project. */
   heroesByProject(projectDir: string): HeroSnapshot[] {
     return [...this.heroes.values()].filter((h) => h.projectDir === projectDir);
   }
@@ -111,8 +110,8 @@ export class World {
     this.emit(line);
   }
 
-  /** Publiczny emit dla zdarzeń niestandardowych (np. arsenal-updated
-   * z pollerów, które nie są źródłem agentów). */
+  /** Public emit for custom events (for example arsenal-updated from pollers
+   * that are not agent sources). */
   emitCustom(event: GameEvent): void {
     this.emit(event);
   }
