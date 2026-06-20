@@ -65,3 +65,5 @@
   - Keep commits focused and reviewable.
   - Do not revert user changes unless explicitly requested.
   - Keep generated build output out of commits unless the project explicitly requires it.
+
+<!-- SourceTree push smoke tests need a real commit; an up-to-date push only checks credential lookup. -->
