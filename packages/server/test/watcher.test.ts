@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { appendFile, mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { isLiveAtStartup } from '../src/watcher.js';
@@ -124,6 +124,57 @@ describe('SourceWatcher — subagenci z metadanych źródła', () => {
         parentSessionId: 'parent-session',
         description: 'Leibniz',
         state: 'working',
+        currentTool: 'Bash',
+      });
+    } finally {
+      await watcher.stop();
+      await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it('large existing Codex subagent files keep peon routing after tailing from the end', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'aoa-watcher-large-'));
+    const file = join(dir, 'rollout-child-session.jsonl');
+    const world = new World();
+    const source: AgentSource = {
+      id: 'codex',
+      roots: () => [dir],
+      classify: (path) => path.endsWith('.jsonl')
+        ? { kind: 'session', sessionId: 'child-session', projectDir: '' }
+        : { kind: 'other' },
+      parseLine: (line): Fact[] => JSON.parse(line) as Fact[],
+    };
+    const watcher = new SourceWatcher(world, source, {
+      ...DEFAULT_THRESHOLDS,
+      removeAfterMs: 60_000,
+    });
+    const now = Date.now();
+    try {
+      await writeFile(
+        file,
+        JSON.stringify([{ kind: 'subagent-meta', agentId: 'child-session', parentSessionId: 'parent-session', description: 'Leibniz' }]) +
+          '\n' +
+          'x'.repeat(2 * 1024 * 1024 + 1) +
+          '\n',
+      );
+
+      await (watcher as unknown as {
+        handleFile(path: string, stats: { mtimeMs: number; size: number }, initial: boolean): Promise<void>;
+      }).handleFile(file, { mtimeMs: now, size: 2 * 1024 * 1024 + 200 }, true);
+
+      await appendFile(
+        file,
+        JSON.stringify([{ kind: 'tool-start', tool: 'Bash', detail: 'npm test', messageId: 'c1', ts: '2026-06-19T20:14:30.000Z' }]) + '\n',
+      );
+      await (watcher as unknown as {
+        handleFile(path: string, stats: { mtimeMs: number; size: number }, initial: boolean): Promise<void>;
+      }).handleFile(file, { mtimeMs: now, size: 2 * 1024 * 1024 + 400 }, false);
+
+      expect(world.snapshot().heroes).toEqual([]);
+      expect(world.snapshot().peons[0]).toMatchObject({
+        agentId: 'child-session',
+        parentSessionId: 'parent-session',
+        description: 'Leibniz',
         currentTool: 'Bash',
       });
     } finally {

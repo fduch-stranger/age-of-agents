@@ -1,4 +1,5 @@
 import { watch, type FSWatcher } from 'chokidar';
+import { open } from 'node:fs/promises';
 import { sep } from 'node:path';
 import type { PeonSnapshot } from '@agent-citadel/shared';
 import { TailRegistry } from './transcript/tail.js';
@@ -20,6 +21,7 @@ export function isLiveAtStartup(mtimeMs: number, nowMs: number, windowMs: number
 /** Większe pliki tail-ujemy od końca zamiast odtwarzać całą historię. */
 const REPLAY_MAX_BYTES = 2 * 1024 * 1024;
 const SWEEP_INTERVAL_MS = 15_000;
+const META_SCAN_BYTES = 64 * 1024;
 
 interface PeonEntry {
   peon: PeonSnapshot;
@@ -132,7 +134,10 @@ export class SourceWatcher {
     if (!this.tails.has(path)) {
       const fresh = !initial || isLiveAtStartup(stats?.mtimeMs ?? 0, Date.now(), this.thresholds.removeAfterMs);
       if (!fresh) return; // stara sesja — obudzi się przy zdarzeniu 'change'
-      if ((stats?.size ?? 0) > REPLAY_MAX_BYTES) await this.tails.registerAtEnd(path);
+      if ((stats?.size ?? 0) > REPLAY_MAX_BYTES) {
+        if (target.kind === 'session') await this.scanSessionMetadata(path);
+        await this.tails.registerAtEnd(path);
+      }
     }
 
     const lines = await this.tails.readNewLines(path);
@@ -172,6 +177,19 @@ export class SourceWatcher {
 
   private applyPeonLines(agentId: string, parentSessionId: string, lines: string[], description?: string): void {
     this.applyPeonFacts(agentId, parentSessionId, lines.flatMap((line) => this.source.parseLine(line)), description);
+  }
+
+  private async scanSessionMetadata(path: string): Promise<void> {
+    const lines = await readInitialLines(path, META_SCAN_BYTES);
+    const subagentMeta = lines
+      .flatMap((line) => this.source.parseLine(line))
+      .find((fact): fact is import('./transcript/facts.js').Fact & { kind: 'subagent-meta' } => fact.kind === 'subagent-meta');
+    if (!subagentMeta) return;
+    this.subagentFiles.set(path, {
+      agentId: subagentMeta.agentId,
+      parentSessionId: subagentMeta.parentSessionId,
+      description: subagentMeta.description,
+    });
   }
 
   private applyPeonFacts(
@@ -216,5 +234,22 @@ export class SourceWatcher {
         this.peons.delete(agentId);
       }
     }
+  }
+}
+
+async function readInitialLines(path: string, maxBytes: number): Promise<string[]> {
+  const file = await open(path, 'r');
+  try {
+    const buffer = Buffer.alloc(maxBytes);
+    const { bytesRead } = await file.read(buffer, 0, maxBytes, 0);
+    const text = buffer.subarray(0, bytesRead).toString('utf8');
+    return text
+      .split('\n')
+      .slice(0, -1)
+      .filter((line) => line.trim().length > 0);
+  } catch {
+    return [];
+  } finally {
+    await file.close();
   }
 }
