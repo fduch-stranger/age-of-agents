@@ -1,13 +1,13 @@
 import { randomUUID } from 'node:crypto';
 import type { LaunchParams, LiveSession, SdkRunner } from './types.js';
 import type { PendingRegistry } from '../pending-registry.js';
-import { makeCanUseTool, makeAskQuestionHandler } from './bridge.js';
+import { makeCanUseTool } from './bridge.js';
 
 /**
  * Real adapter over `@anthropic-ai/claude-agent-sdk`. Imported dynamically so the
- * app runs without the optional dependency installed. AskUserQuestion is routed
- * to an in-process MCP tool via `toolAliases`; permissions/plan go through
- * `canUseTool`. Both resolve via the shared PendingRegistry (panel answers).
+ * app runs without the optional dependency installed. Permissions, plan approval
+ * AND AskUserQuestion all go through the official `canUseTool` callback (the SDK's
+ * documented path), which resolves via the shared PendingRegistry (panel answers).
  */
 export class RealSdkRunner implements SdkRunner {
   constructor(private registry: PendingRegistry, private timeoutMs: number) {}
@@ -33,16 +33,6 @@ export class RealSdkRunner implements SdkRunner {
       }
     }
 
-    // Empty input schema: avoids a hard `zod` dependency (the SDK builds the schema
-    // with its own bundled zod). For an aliased AskUserQuestion call the question
-    // payload is forwarded from the model's call, so the handler parses it loosely.
-    const askTool = sdk.tool(
-      'askUserQuestion',
-      'Ask the user a multiple-choice question and return their selection.',
-      {},
-      async (args: Record<string, unknown>, extra: unknown) => makeAskQuestionHandler(idFor(), this.registry, this.timeoutMs)(args, extra),
-    );
-    const panelServer = sdk.createSdkMcpServer({ name: 'panel', version: '1.0.0', tools: [askTool] });
     const abort = new AbortController();
 
     type LiveQuery = { interrupt(): Promise<void> } & AsyncIterable<{ session_id?: string }>;
@@ -52,10 +42,9 @@ export class RealSdkRunner implements SdkRunner {
         cwd: params.cwd,
         ...(params.model ? { model: params.model } : {}),
         permissionMode: params.permissionMode,
+        // One callback handles permissions, plan approval AND AskUserQuestion.
         canUseTool: (tool: string, input: Record<string, unknown>) =>
           makeCanUseTool(idFor(), this.registry, this.timeoutMs)(tool, input, undefined) as never,
-        mcpServers: { panel: panelServer },
-        toolAliases: { AskUserQuestion: 'mcp__panel__askUserQuestion' },
         abortController: abort,
       } as never,
     }) as unknown as LiveQuery;
