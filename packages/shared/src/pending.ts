@@ -177,3 +177,38 @@ export function validateQuestionAnswer(
   if (typeof t !== 'string' || !known.includes(t)) return { ok: false, error: `Unknown decision type ${String(t)}.` };
   return { ok: true, answer: { id: obj.id, decision: d as unknown as QuestionDecision } };
 }
+
+// ---- Launch agent request (client -> server) ----
+
+/** Permission modes we expose in the launch dialog (subset of the SDK's). */
+export type SdkPermissionMode = 'default' | 'acceptEdits' | 'plan' | 'bypassPermissions';
+export const SDK_PERMISSION_MODES: readonly SdkPermissionMode[] = ['default', 'acceptEdits', 'plan', 'bypassPermissions'];
+
+export interface LaunchAgentRequest {
+  cwd: string;
+  prompt: string;
+  model?: string;
+  permissionMode: SdkPermissionMode;
+}
+
+export function validateLaunchRequest(
+  input: unknown,
+): { ok: true; value: LaunchAgentRequest } | { ok: false; error: string } {
+  if (typeof input !== 'object' || input === null) return { ok: false, error: 'Request must be an object.' };
+  const o = input as Record<string, unknown>;
+  if (typeof o.cwd !== 'string' || !o.cwd.trim()) return { ok: false, error: '"cwd" required.' };
+  if (typeof o.prompt !== 'string' || !o.prompt.trim()) return { ok: false, error: '"prompt" required.' };
+  let permissionMode: SdkPermissionMode = 'default';
+  if (o.permissionMode !== undefined) {
+    if (!SDK_PERMISSION_MODES.includes(o.permissionMode as SdkPermissionMode)) {
+      return { ok: false, error: `Unknown permissionMode ${String(o.permissionMode)}.` };
+    }
+    permissionMode = o.permissionMode as SdkPermissionMode;
+  }
+  const value: LaunchAgentRequest = { cwd: o.cwd.trim(), prompt: o.prompt, permissionMode };
+  if (o.model !== undefined) {
+    if (typeof o.model !== 'string') return { ok: false, error: '"model" must be a string.' };
+    if (o.model.trim()) value.model = o.model.trim();
+  }
+  return { ok: true, value };
+}
