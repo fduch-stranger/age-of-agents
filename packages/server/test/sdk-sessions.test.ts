@@ -23,4 +23,11 @@ describe('LiveSessionRegistry', () => {
     expect(reg.pushText('nope', 'x')).toBe(false);
     await expect(reg.stop('nope')).resolves.toBe(false);
   });
+
+  it('fires onSessionStarted exactly once with the session id', async () => {
+    const seen: string[] = [];
+    const reg = new LiveSessionRegistry(new FakeSdkRunner(), (id) => seen.push(id));
+    await reg.launch({ cwd: '/p', prompt: 'x', permissionMode: 'default' });
+    expect(seen).toEqual(['fake-session-1']);
+  });
 });

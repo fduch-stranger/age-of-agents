@@ -60,7 +60,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     app.post('/hooks/decide', async () => ({}));
     registerPermissionPolicyRoutes(app, { persist: false });
     const { FakeSdkRunner } = await import('./sdk/fake-runner.js');
-    liveSessions = new LiveSessionRegistry(new FakeSdkRunner());
+    liveSessions = new LiveSessionRegistry(new FakeSdkRunner(), (sessionId) => world.emitCustom({ type: 'sdk-session-started', sessionId }));
     registerSessionRoutes(app, { sessions: liveSessions });
     registerFsRoutes(app);
   } else {
@@ -89,7 +89,7 @@ export async function startServer(opts: StartServerOptions): Promise<RunningServ
     const { loadPermissionPolicy, addPolicyRule } = await import('./permission-policy.js');
     registerPermissionPolicyRoutes(app, { persist: true, policyPath: opts.policyPath });
     const { RealSdkRunner } = await import('./sdk/real-runner.js');
-    liveSessions = new LiveSessionRegistry(new RealSdkRunner(pendingRegistry, (DECIDE_TIMEOUT_SEC - 10) * 1000));
+    liveSessions = new LiveSessionRegistry(new RealSdkRunner(pendingRegistry, (DECIDE_TIMEOUT_SEC - 10) * 1000), (sessionId) => world.emitCustom({ type: 'sdk-session-started', sessionId }));
     registerSessionRoutes(app, { sessions: liveSessions });
     registerFsRoutes(app);
 

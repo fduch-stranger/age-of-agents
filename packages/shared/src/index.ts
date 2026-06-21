@@ -119,7 +119,8 @@ export type GameEvent =
   | { type: 'transcript-line'; line: TranscriptLine }
   | { type: 'arsenal-updated'; arsenal: ProjectArsenal }
   | { type: 'pending-question'; question: PendingQuestion }
-  | { type: 'pending-question-resolved'; id: string };
+  | { type: 'pending-question-resolved'; id: string }
+  | { type: 'sdk-session-started'; sessionId: string };
 
 export const SERVER_PORT = 8123;
 export const WS_PATH = '/ws';

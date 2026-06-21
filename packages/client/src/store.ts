@@ -163,6 +163,8 @@ export const useWorld = create<WorldStore>((set) => ({
           delete pending[event.id];
           return { pending, openQuestionId: state.openQuestionId === event.id ? undefined : state.openQuestionId };
         }
+        case 'sdk-session-started':
+          return { sdkSessionIds: { ...state.sdkSessionIds, [event.sessionId]: true } };
         default:
           return state;
       }

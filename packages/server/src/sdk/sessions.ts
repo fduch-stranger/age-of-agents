@@ -5,14 +5,20 @@ interface Entry { session: LiveSession; sessionId?: string; startedAt: string; c
 /** Tracks the agent sessions the app owns (launched via the SDK). */
 export class LiveSessionRegistry {
   private entries: Entry[] = [];
-  constructor(private runner: SdkRunner) {}
+  /** `onSessionStarted` fires when a session's real id becomes known — possibly
+   *  AFTER `launch()` returns (the SDK reports it asynchronously). The server uses
+   *  it to broadcast the id so the client can attach session controls. */
+  constructor(private runner: SdkRunner, private onSessionStarted?: (sessionId: string) => void) {}
 
   available(): Promise<boolean> { return this.runner.available(); }
 
   async launch(params: LaunchParams): Promise<{ sessionId?: string }> {
     const entry: Entry = { session: undefined as unknown as LiveSession, startedAt: new Date().toISOString(), cwd: params.cwd };
-    entry.session = await this.runner.launch(params, { onSessionId: (id) => { entry.sessionId = id; } });
+    let emitted = false;
+    const emit = (id: string) => { if (!emitted) { emitted = true; this.onSessionStarted?.(id); } };
+    entry.session = await this.runner.launch(params, { onSessionId: (id) => { entry.sessionId = id; emit(id); } });
     entry.sessionId ??= entry.session.sessionId;
+    if (entry.sessionId) emit(entry.sessionId);
     this.entries.push(entry);
     return { sessionId: entry.sessionId };
   }
