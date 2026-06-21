@@ -9,16 +9,21 @@ interface SettingsStore {
   flipped: boolean;
   /** Czy panel misji (MissionLog) jest zwinięty do paska tytułu. */
   missionsCollapsed: boolean;
+  /** Czy klaster sterowania agentami (hooki / panel answering / launch) w górnym
+   *  pasku jest zwinięty za chevron. Domyślnie zwinięty, by pasek się nie rozjeżdżał. */
+  barCollapsed: boolean;
   setTheme(id: string): void;
   setLang(lang: Lang): void;
   setFlipped(flipped: boolean): void;
   setMissionsCollapsed(collapsed: boolean): void;
+  setBarCollapsed(collapsed: boolean): void;
 }
 
 const STORAGE_KEY = 'agent-citadel.theme';
 const LANG_KEY = 'agent-citadel.lang';
 const FLIP_KEY = 'agent-citadel.flip';
 const MISSIONS_COLLAPSED_KEY = 'agent-citadel.missions-collapsed';
+const BAR_COLLAPSED_KEY = 'agent-citadel.bar-collapsed';
 
 const VALID_LANGS: Lang[] = ['en', 'pl', 'it'];
 
@@ -31,6 +36,8 @@ export const useSettings = create<SettingsStore>((set) => ({
   lang: isValidLang(localStorage.getItem(LANG_KEY)) ? (localStorage.getItem(LANG_KEY) as Lang) : 'en', // default EN
   flipped: localStorage.getItem(FLIP_KEY) === '1',
   missionsCollapsed: localStorage.getItem(MISSIONS_COLLAPSED_KEY) === '1',
+  // Default collapsed (only '0' expands) so the top bar stays compact out of the box.
+  barCollapsed: localStorage.getItem(BAR_COLLAPSED_KEY) !== '0',
   setTheme: (themeId) => {
     localStorage.setItem(STORAGE_KEY, themeId);
     set({ themeId });
@@ -46,5 +53,9 @@ export const useSettings = create<SettingsStore>((set) => ({
   setMissionsCollapsed: (missionsCollapsed) => {
     localStorage.setItem(MISSIONS_COLLAPSED_KEY, missionsCollapsed ? '1' : '0');
     set({ missionsCollapsed });
+  },
+  setBarCollapsed: (barCollapsed) => {
+    localStorage.setItem(BAR_COLLAPSED_KEY, barCollapsed ? '1' : '0');
+    set({ barCollapsed });
   },
 }));

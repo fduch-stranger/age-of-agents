@@ -22,6 +22,8 @@ export function ThemeSwitch() {
   const setLang = useSettings((s) => s.setLang);
   const flipped = useSettings((s) => s.flipped);
   const setFlipped = useSettings((s) => s.setFlipped);
+  const barCollapsed = useSettings((s) => s.barCollapsed);
+  const setBarCollapsed = useSettings((s) => s.setBarCollapsed);
   const t = useUi();
 
   const [langOpen, setLangOpen] = useState(false);
@@ -76,9 +78,26 @@ export function ThemeSwitch() {
       >
         🛰️ {t.scifi}
       </button>
-      <HooksPanel />
-      <PanelControlToggle />
-      <LaunchAgentButton />
+      {/* Agent-control cluster (hooks / panel answering / launch) — collapsible so
+          the top bar stays compact; remembered across reloads. */}
+      <button
+        className="ghost"
+        onClick={() => setBarCollapsed(!barCollapsed)}
+        title={t.agentControls}
+        aria-label={t.agentControls}
+        aria-expanded={!barCollapsed}
+        style={{ display: 'inline-flex', alignItems: 'center', gap: 3 }}
+      >
+        🤖
+        <span aria-hidden style={{ fontSize: 9 }}>{barCollapsed ? '▸' : '◂'}</span>
+      </button>
+      {!barCollapsed && (
+        <>
+          <HooksPanel />
+          <PanelControlToggle />
+          <LaunchAgentButton />
+        </>
+      )}
 
       {/* Language as dropdown instead of a cycling button. */}
       <div ref={langRef} style={{ position: 'relative' }}>
