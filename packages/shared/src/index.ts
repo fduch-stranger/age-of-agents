@@ -476,6 +476,25 @@ export function resolveSprite(
   return { sprite: cfg.fallback.sprite };
 }
 
+/** Identity axis (multi): every sprite the model matches, in rule order, de-duplicated.
+ *  Empty/no-match -> [fallback.sprite]. Basis for client-side random selection. */
+export function resolveSpriteCandidates(model: string | undefined, cfg: ModelConfig): SpriteId[] {
+  const out: SpriteId[] = [];
+  if (model) {
+    for (const r of cfg.sprites) {
+      if (matchModel(model, r.match) && !out.includes(r.sprite)) out.push(r.sprite);
+    }
+  }
+  return out.length ? out : [cfg.fallback.sprite];
+}
+
+/** Pick one sprite from candidates. <=1 -> the single (rng untouched); else rng-indexed.
+ *  rng defaults to Math.random; injected in tests for determinism. */
+export function pickSprite(candidates: readonly SpriteId[], rng: () => number = Math.random): SpriteId {
+  if (candidates.length <= 1) return candidates[0];
+  return candidates[Math.floor(rng() * candidates.length)];
+}
+
 /** Capacity axis: first matching WindowRule, otherwise fallback.contextWindow. */
 export function resolveContextWindow(model: string | undefined, cfg: ModelConfig): number {
   if (model) {
