@@ -2,7 +2,8 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { spawn } from 'node:child_process';
 import { startServer } from './server.js';
-import { parseArgs, shouldOpenBrowser } from './cli-args.js';
+import { parseArgs, shouldOpenBrowser, parseSubcommand } from './cli-args.js';
+import { startOllamaLoggerProxy } from './proxy/ollama-logger.js';
 
 // Safety net: after startup, a single unhandled error must not shut down the
 // visualization server. Startup errors still go to main().catch below.
@@ -44,8 +45,40 @@ function openBrowser(url: string): void {
   }
 }
 
+async function runLocal(rest: string[]): Promise<number> {
+  const model = rest[0];
+  if (!model) {
+    process.stderr.write('Usage: aoa local <model> [ollama run args…]\n');
+    return 1;
+  }
+  const proxy = await startOllamaLoggerProxy();
+  // `ollama` reads OLLAMA_HOST as "host:port" (no scheme).
+  const ollamaHost = proxy.url.replace(/^https?:\/\//, '');
+  process.stdout.write(`  ▸ Logging this session to Age of Agents (proxy ${proxy.url})\n\n`);
+  const child = spawn('ollama', ['run', ...rest], {
+    stdio: 'inherit',
+    env: { ...process.env, OLLAMA_HOST: ollamaHost },
+  });
+  return await new Promise<number>((resolve) => {
+    child.on('error', (err) => {
+      process.stderr.write(`Failed to run 'ollama' — is it installed and on PATH? (${(err as Error).message})\n`);
+      resolve(127);
+    });
+    child.on('exit', (code) => {
+      void proxy.close().then(() => resolve(code ?? 0));
+    });
+  });
+}
+
 async function main(): Promise<void> {
-  const opts = parseArgs(process.argv.slice(2));
+  const { command, rest } = parseSubcommand(process.argv.slice(2));
+  if (command === 'local') {
+    process.exitCode = await runLocal(rest);
+    return;
+  }
+  // (Task 6 adds: if (command === 'local-proxy') …)
+
+  const opts = parseArgs(rest);
   if (opts.help) {
     process.stdout.write(HELP);
     return;
