@@ -6,10 +6,6 @@ import { join } from 'node:path';
 
 let running: RunningServer | undefined;
 
-function tokenPath(): string {
-  return join(mkdtempSync(join(tmpdir(), 'aoa-server-')), 'session-token');
-}
-
 afterEach(async () => {
   await running?.close();
   running = undefined;
@@ -17,7 +13,7 @@ afterEach(async () => {
 
 describe('startServer', () => {
   it('serves /health in demo mode and returns a real port', async () => {
-    running = await startServer({ port: 0, demo: true, tokenPath: tokenPath() });
+    running = await startServer({ port: 0, demo: true });
     expect(running.port).toBeGreaterThan(0);
     const res = await fetch(`http://localhost:${running.port}/health`);
     expect(res.status).toBe(200);
@@ -27,7 +23,7 @@ describe('startServer', () => {
   it('serves client index.html from webRoot', async () => {
     const dir = mkdtempSync(join(tmpdir(), 'aoa-web-'));
     writeFileSync(join(dir, 'index.html'), '<!doctype html><title>AIOA-TEST</title>');
-    running = await startServer({ port: 0, demo: true, webRoot: dir, tokenPath: tokenPath() });
+    running = await startServer({ port: 0, demo: true, webRoot: dir });
 
     const root = await fetch(`http://localhost:${running.port}/`);
     expect(root.status).toBe(200);
@@ -40,7 +36,7 @@ describe('startServer', () => {
   });
 
   it('GET /tool-mapping returns valid config', async () => {
-    running = await startServer({ port: 0, demo: true, tokenPath: tokenPath() });
+    running = await startServer({ port: 0, demo: true });
     const res = await fetch(`http://localhost:${running.port}/tool-mapping`);
     expect(res.status).toBe(200);
     const cfg = await res.json();
@@ -50,7 +46,7 @@ describe('startServer', () => {
   });
 
   it('PUT /tool-mapping rejects invalid config (400)', async () => {
-    running = await startServer({ port: 0, demo: true, tokenPath: tokenPath() });
+    running = await startServer({ port: 0, demo: true });
     const res = await fetch(`http://localhost:${running.port}/tool-mapping`, {
       method: 'PUT',
       headers: { 'content-type': 'application/json', 'x-aoa-token': running.token },
@@ -61,7 +57,7 @@ describe('startServer', () => {
   });
 
   it('PUT /tool-mapping accepts valid config (200, echo)', async () => {
-    running = await startServer({ port: 0, demo: true, tokenPath: tokenPath() });
+    running = await startServer({ port: 0, demo: true });
     const cfg = { rules: [{ kind: 'exact', tool: 'Edit', building: 'library' }], fallback: 'citadel' };
     const res = await fetch(`http://localhost:${running.port}/tool-mapping`, {
       method: 'PUT',
@@ -76,7 +72,7 @@ describe('startServer', () => {
     const prev = process.env.AOA_SOURCES;
     process.env.AOA_SOURCES = 'codex';
     try {
-      running = await startServer({ port: 0, demo: false, tokenPath: tokenPath() });
+      running = await startServer({ port: 0, demo: false });
       const res = await fetch(`${running.url}/health`);
       expect(await res.json()).toEqual({ ok: true, demo: false });
     } finally {
@@ -99,7 +95,7 @@ describe('startServer', () => {
     process.env.AOA_SOURCES = 'opencode';
     try {
       const { startServer: startServerWithMock } = await import('../src/server.js');
-      localRunning = await startServerWithMock({ port: 0, demo: false, tokenPath: tokenPath() });
+      localRunning = await startServerWithMock({ port: 0, demo: false });
       await localRunning.close();
       localRunning = undefined;
 
@@ -147,7 +143,7 @@ describe('startServer', () => {
     process.env.AOA_SOURCES = 'claude';
     try {
       const { startServer: startServerWithMock } = await import('../src/server.js');
-      localRunning = await startServerWithMock({ port: 0, demo: false, tokenPath: tokenPath() });
+      localRunning = await startServerWithMock({ port: 0, demo: false });
       await localRunning.close();
       localRunning = undefined;
 
@@ -196,7 +192,7 @@ describe('startServer', () => {
     process.env.AOA_SOURCES = 'codex';
     try {
       const { startServer: startServerWithMock } = await import('../src/server.js');
-      localRunning = await startServerWithMock({ port: 0, demo: false, tokenPath: tokenPath() });
+      localRunning = await startServerWithMock({ port: 0, demo: false });
       await localRunning.close();
       localRunning = undefined;
 
@@ -240,7 +236,7 @@ describe('startServer', () => {
     process.env.AOA_SOURCES = 'codex';
     try {
       const { startServer: startServerWithMock } = await import('../src/server.js');
-      localRunning = await startServerWithMock({ port: 0, demo: false, tokenPath: tokenPath() });
+      localRunning = await startServerWithMock({ port: 0, demo: false });
       await localRunning.close();
       localRunning = undefined;
 
@@ -282,7 +278,7 @@ describe('startServer', () => {
     process.env.AOA_SOURCES = 'codex';
     try {
       const { startServer: startServerWithMock } = await import('../src/server.js');
-      localRunning = await startServerWithMock({ port: 0, demo: false, tokenPath: tokenPath() });
+      localRunning = await startServerWithMock({ port: 0, demo: false });
       const res = await fetch(`${localRunning.url}/hooks`, {
         method: 'POST',
         headers: { 'content-type': 'application/json' },

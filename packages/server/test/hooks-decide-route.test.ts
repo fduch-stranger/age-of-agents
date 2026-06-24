@@ -18,13 +18,9 @@ function policyFile(enabled: boolean): string {
   return p;
 }
 
-function tokenPath(): string {
-  return join(mkdtempSync(join(tmpdir(), 'aoa-hook-decide-')), 'session-token');
-}
-
 describe('/hooks/decide', () => {
   it('disabled policy -> {} (defer)', async () => {
-    server = await startServer({ port: 0, demo: false, policyPath: policyFile(false), tokenPath: tokenPath() });
+    server = await startServer({ port: 0, demo: false, policyPath: policyFile(false) });
     const res = await fetch(`${server.url}/hooks/decide`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
@@ -34,7 +30,7 @@ describe('/hooks/decide', () => {
   });
 
   it('enabled + WS answer allow -> allow decision', async () => {
-    server = await startServer({ port: 0, demo: false, policyPath: policyFile(true), tokenPath: tokenPath() });
+    server = await startServer({ port: 0, demo: false, policyPath: policyFile(true) });
     const ws = new WebSocket(`${server.url.replace('http', 'ws')}${WS_PATH}?token=${server.token}`);
     const pending = new Promise<PendingQuestion>((resolve) => {
       ws.on('message', (data) => {

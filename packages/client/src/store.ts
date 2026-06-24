@@ -123,7 +123,6 @@ export const useWorld = create<WorldStore>((set) => ({
           const pending = Object.fromEntries(
             Object.entries(state.pending).filter(([, q]) => q.sessionId !== event.sessionId),
           );
-          // The followed hero was removed: clear selection and autofollow (no dead target).
           if (state.selectedSessionId === event.sessionId) {
             return { heroes, pending, selectedSessionId: undefined, autofollow: false };
           }
