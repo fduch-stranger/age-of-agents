@@ -70,6 +70,14 @@
   - Reload the browser after server/client config changes.
 
 - **Git**:
+  - Branch roles:
+    - `main`: keep tree-identical or very close to `upstream/main`; do not track local agent files here.
+    - `main-fork`: personal branch for tracked local workspace files such as `.serena/` and `AGENTS.md`.
+    - `fix/*` or `feature/*`: clean upstream PR branches; create these from `main` or `refs/remotes/upstream/main`, not from `main-fork`.
+  - When implementing code intended for upstream, work on a clean branch based on `main`/`upstream/main` so `.serena/`, `AGENTS.md`, and fork-only docs do not enter the diff.
+  - Keep local agent files tracked only on `main-fork`. On clean branches they may exist in the working tree but should be ignored via `.git/info/exclude`.
+  - To update local workflow files, switch to `main-fork`, edit `.serena/` or `AGENTS.md`, and commit there.
+  - To update `main-fork` after upstream changes: update `main` from upstream, then rebase `main-fork` onto `main`.
   - Keep commits focused and reviewable.
   - Do not revert user changes unless explicitly requested.
   - Keep generated build output out of commits unless the project explicitly requires it.
