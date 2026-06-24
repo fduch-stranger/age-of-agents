@@ -1,11 +1,13 @@
 import type { ProjectArsenal, WieldedArsenal } from './arsenal.js';
+import type { PendingQuestion } from './pending.js';
 export * from './arsenal.js';
 export * from './providers.js';
+export * from './pending.js';
 
 /** Agent Citadel WebSocket protocol: shared server/client types. */
 
 /** Which CLI generated the session; controls the hero badge and tool mapping. */
-export type AgentKind = 'claude' | 'codex' | 'opencode' | 'koda';
+export type AgentKind = 'claude' | 'codex' | 'opencode' | 'koda' | 'local-llm';
 
 export type HeroStateKind =
   | 'thinking'
@@ -115,7 +117,10 @@ export type GameEvent =
   | { type: 'mission-started'; mission: MissionSnapshot }
   | { type: 'mission-completed'; mission: MissionSnapshot }
   | { type: 'transcript-line'; line: TranscriptLine }
-  | { type: 'arsenal-updated'; arsenal: ProjectArsenal };
+  | { type: 'arsenal-updated'; arsenal: ProjectArsenal }
+  | { type: 'pending-question'; question: PendingQuestion }
+  | { type: 'pending-question-resolved'; id: string }
+  | { type: 'sdk-session-started'; sessionId: string };
 
 export const SERVER_PORT = 8123;
 export const WS_PATH = '/ws';
@@ -410,7 +415,7 @@ export function validateMapping(
 // In each table, the first match wins (order is priority).
 
 /** Pool of available hero sprites: the single source of truth imported by the client. */
-export const SPRITE_IDS = ['opus', 'sonnet', 'haiku', 'fable'] as const;
+export const SPRITE_IDS = ['opus', 'sonnet', 'haiku', 'fable', 'local', 'golem', 'familiar', 'oracle'] as const;
 export type SpriteId = (typeof SPRITE_IDS)[number];
 
 const SPRITE_ID_SET: ReadonlySet<string> = new Set(SPRITE_IDS);
@@ -471,6 +476,25 @@ export function resolveSprite(
   return { sprite: cfg.fallback.sprite };
 }
 
+/** Identity axis (multi): every sprite the model matches, in rule order, de-duplicated.
+ *  Empty/no-match -> [fallback.sprite]. Basis for client-side random selection. */
+export function resolveSpriteCandidates(model: string | undefined, cfg: ModelConfig): SpriteId[] {
+  const out: SpriteId[] = [];
+  if (model) {
+    for (const r of cfg.sprites) {
+      if (matchModel(model, r.match) && !out.includes(r.sprite)) out.push(r.sprite);
+    }
+  }
+  return out.length ? out : [cfg.fallback.sprite];
+}
+
+/** Pick one sprite from candidates. <=1 -> the single (rng untouched); else rng-indexed.
+ *  rng defaults to Math.random; injected in tests for determinism. */
+export function pickSprite(candidates: readonly SpriteId[], rng: () => number = Math.random): SpriteId {
+  if (candidates.length <= 1) return candidates[0];
+  return candidates[Math.floor(rng() * candidates.length)];
+}
+
 /** Capacity axis: first matching WindowRule, otherwise fallback.contextWindow. */
 export function resolveContextWindow(model: string | undefined, cfg: ModelConfig): number {
   if (model) {
@@ -500,11 +524,22 @@ export const DEFAULT_MODEL_CONFIG: ModelConfig = {
     { match: { kind: 'exact', id: 'gpt-5.5' }, sprite: 'fable', displayName: 'GPT-5.5' },
     { match: { kind: 'pattern', pattern: 'gpt-5.4-codex' }, sprite: 'fable', displayName: 'GPT-5.4 Codex' },
     { match: { kind: 'pattern', pattern: 'gpt-5.4-mini' }, sprite: 'haiku', displayName: 'GPT-5.4 Mini' },
+    { match: { kind: 'pattern', pattern: 'gpt-oss' }, sprite: 'fable', displayName: 'GPT-OSS' },
     { match: { kind: 'pattern', pattern: 'gpt-' }, sprite: 'fable', displayName: 'GPT' },
     { match: { kind: 'pattern', pattern: 'opus' }, sprite: 'opus', displayName: 'Opus 4.8' },
     { match: { kind: 'pattern', pattern: 'sonnet' }, sprite: 'sonnet', displayName: 'Sonnet 4.6' },
     { match: { kind: 'pattern', pattern: 'haiku' }, sprite: 'haiku', displayName: 'Haiku 4.5' },
     { match: { kind: 'pattern', pattern: 'fable' }, sprite: 'fable', displayName: 'Fable 5' },
+    // Local model families (Ollama/llama.cpp/vLLM/oMLX) — dedicated 'local' sprite.
+    { match: { kind: 'pattern', pattern: 'llama' }, sprite: 'local', displayName: 'Llama' },
+    { match: { kind: 'pattern', pattern: 'qwen' }, sprite: 'local', displayName: 'Qwen' },
+    { match: { kind: 'pattern', pattern: 'ministral' }, sprite: 'local', displayName: 'Ministral' },
+    { match: { kind: 'pattern', pattern: 'mistral' }, sprite: 'local', displayName: 'Mistral' },
+    { match: { kind: 'pattern', pattern: 'gemma' }, sprite: 'local', displayName: 'Gemma' },
+    { match: { kind: 'pattern', pattern: 'phi' }, sprite: 'local', displayName: 'Phi' },
+    { match: { kind: 'pattern', pattern: 'bielik' }, sprite: 'local', displayName: 'Bielik' },
+    { match: { kind: 'pattern', pattern: 'glm' }, sprite: 'local', displayName: 'GLM' },
+    { match: { kind: 'pattern', pattern: 'lfm' }, sprite: 'local', displayName: 'LFM' },
   ],
   windows: [
     { match: { kind: 'pattern', pattern: '[1m]' }, contextWindow: 1_000_000 }, // explicit 1M tag beats base model

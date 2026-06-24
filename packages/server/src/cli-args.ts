@@ -54,3 +54,17 @@ export function shouldOpenBrowser(mode: OpenMode, env: { ci: boolean; isTTY: boo
   if (mode === 'always') return true;
   return !env.ci && env.isTTY;
 }
+
+export type Subcommand = 'serve' | 'local' | 'local-proxy';
+
+/**
+ * Splits a leading subcommand off argv. A token is a subcommand only if it is
+ * the first arg and not a flag, so existing flag-only invocations keep working.
+ */
+export function parseSubcommand(argv: string[]): { command: Subcommand; rest: string[] } {
+  const first = argv[0];
+  if (first === 'local' || first === 'local-proxy') {
+    return { command: first, rest: argv.slice(1) };
+  }
+  return { command: 'serve', rest: argv };
+}

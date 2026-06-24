@@ -1,12 +1,18 @@
 import { create } from 'zustand';
 import {
   resolveModel,
+  resolveSpriteCandidates,
+  pickSprite,
+  SPRITE_IDS,
   DEFAULT_MODEL_CONFIG,
   upgradeModelConfig,
   validateModelConfig,
   type ModelConfig,
   type ResolvedModel,
+  type SpriteId,
 } from './theme/models';
+import { useSettings } from './settings';
+import { apiFetch } from './api';
 
 /**
  * Editable model-registry store. The local server is the source of truth (file),
@@ -39,7 +45,7 @@ function writeCache(config: ModelConfig): void {
 function putModels(config: ModelConfig): void {
   if (typeof fetch === 'undefined') return;
   try {
-    fetch('/model-config', {
+    apiFetch('/model-config', {
       method: 'PUT',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify(config),
@@ -103,4 +109,15 @@ export const useModels = create<ModelStore>((set, get) => ({
  */
 export function resolveModelLive(model: string | undefined): ResolvedModel {
   return resolveModel(model, useModels.getState().models);
+}
+
+/** Live sprite choice for a hero at spawn. With all-random ON, draws from the whole
+ *  pool (mapping ignored); otherwise from the model's matching sprites, picking one at
+ *  random on a tie. Reroll happens per Unit creation (i.e. on page refresh). Twin of
+ *  resolveModelLive. */
+export function pickSpriteLive(model: string | undefined): SpriteId {
+  const candidates = useSettings.getState().allRandom
+    ? SPRITE_IDS
+    : resolveSpriteCandidates(model, useModels.getState().models);
+  return pickSprite(candidates);
 }

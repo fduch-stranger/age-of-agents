@@ -13,6 +13,8 @@ import { getGameView } from '../game/view';
 import { clip, formatK, relTime } from '../util';
 import { StatTile } from './StatTile';
 import { ContextBar } from './ContextBar';
+import { PendingQuestionCard } from './PendingQuestionCard';
+import { sendSessionMessage, stopSession } from '../sessions';
 
 // Stable reference: a selector returning fresh [] on every call would put
 // useSyncExternalStore into an infinite render loop.
@@ -57,6 +59,7 @@ const BUILDING_EMOJI: Record<BuildingId, string> = {
 export function SidePanel() {
   const selected = useWorld((s) => s.selectedSessionId);
   const hero = useWorld((s) => (selected ? s.heroes[selected] : undefined));
+  const isSdk = useWorld((s) => (selected ? !!s.sdkSessionIds[selected] : false));
   const peonsMap = useWorld((s) => s.peons);
   const missionsMap = useWorld((s) => s.missions);
   const lines = useWorld((s) => (selected ? s.transcripts[selected] ?? NO_LINES : NO_LINES));
@@ -173,6 +176,8 @@ export function SidePanel() {
         </span>
       </div>
 
+      <PendingQuestionCard sessionId={selected} />
+
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
         <StatTile label={t.produced} value={formatK(hero.tokens.output)} />
         <StatTile label={t.read} value={formatK(hero.tokens.input)} />
@@ -224,6 +229,7 @@ export function SidePanel() {
           </div>
         ))}
       </div>
+      {isSdk && selected && <SdkSessionFooter sessionId={selected} />}
     </div>
   );
 }
@@ -232,6 +238,18 @@ function Label({ text }: { text: string }) {
   return (
     <div className="px" style={{ fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.06em', opacity: 0.55, marginBottom: 5 }}>
       {text}
+    </div>
+  );
+}
+
+function SdkSessionFooter({ sessionId }: { sessionId: string }) {
+  const t = useUi();
+  const [text, setText] = useState('');
+  return (
+    <div style={{ display: 'flex', gap: 6, marginTop: 8 }}>
+      <input value={text} onChange={(e) => setText(e.target.value)} placeholder={t.pqSendPlaceholder} style={{ flex: 1 }} />
+      <button className="ghost" disabled={!text.trim()} onClick={() => { void sendSessionMessage(sessionId, text); setText(''); }}>{t.pqSend}</button>
+      <button className="ghost" onClick={() => void stopSession(sessionId)}>{t.pqStop}</button>
     </div>
   );
 }

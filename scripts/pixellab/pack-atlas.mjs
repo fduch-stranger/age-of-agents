@@ -73,5 +73,15 @@ const keys = existsSync(framesRoot)
   : [];
 const packed = keys.map(packCharacter).filter(Boolean);
 mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, 'index.json'), JSON.stringify({ keys: packed }, null, 2));
-console.log(`Packed ${packed.length} atlases into ${outDir}:`, packed.join(', '));
+
+// Non-destructive: merge freshly packed keys with whatever index.json already lists,
+// so packing one new character never drops the existing atlases (their frames are not
+// in downloads/frames). Idempotent: re-running with the same frames is a no-op union.
+const idxPath = join(outDir, 'index.json');
+let existing = [];
+if (existsSync(idxPath)) {
+  try { existing = JSON.parse(readFileSync(idxPath, 'utf8')).keys ?? []; } catch { existing = []; }
+}
+const merged = [...new Set([...existing, ...packed])].sort();
+writeFileSync(idxPath, JSON.stringify({ keys: merged }, null, 2));
+console.log(`Packed ${packed.length} atlas(es); index.json now lists ${merged.length}:`, merged.join(', '));

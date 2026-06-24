@@ -3,6 +3,7 @@ import type {
   GameEvent,
   HeroSnapshot,
   MissionSnapshot,
+  PendingQuestion,
   PeonSnapshot,
   ProjectArsenal,
   TranscriptLine,
@@ -24,18 +25,26 @@ interface WorldStore {
   autofollow: boolean;
   /** Static Arsenal per projectDir (Source A). */
   arsenal: Record<string, ProjectArsenal>;
+  /** Open agent questions awaiting a panel answer, keyed by question id. */
+  pending: Record<string, PendingQuestion>;
   /**
    * Selected project (city). `undefined` = show all (overlay).
    * Affects the side panel: Architect Hall shows only the selected project,
    * and the map filters agents by projectDir.
    */
   selectedProjectDir?: string;
+  /** Id of the AskUserQuestion shown as a centered modal (undefined = closed). */
+  openQuestionId?: string;
+  /** Session ids the app launched via the SDK (drive the reply/stop footer). */
+  sdkSessionIds: Record<string, true>;
   setConnected(connected: boolean): void;
   select(sessionId?: string): void;
   selectBuilding(buildingId?: string): void;
   setAutofollow(on: boolean): void;
   dismissNotification(id: string): void;
   selectProject(projectDir?: string): void;
+  openQuestion(id?: string): void;
+  markSdkSession(sessionId: string): void;
   apply(event: GameEvent): void;
 }
 
@@ -60,6 +69,8 @@ export const useWorld = create<WorldStore>((set) => ({
   notifications: [],
   autofollow: false,
   arsenal: {},
+  pending: {},
+  sdkSessionIds: {},
   setConnected: (connected) => set({ connected }),
   // Unit and building selection are mutually exclusive (one right-side panel).
   // Reset autofollow only when the target CHANGES (opt-in per agent): clicking
@@ -75,6 +86,8 @@ export const useWorld = create<WorldStore>((set) => ({
   dismissNotification: (id) =>
     set((state) => ({ notifications: state.notifications.filter((n) => n.id !== id) })),
   selectProject: (selectedProjectDir) => set({ selectedProjectDir }),
+  openQuestion: (openQuestionId) => set({ openQuestionId }),
+  markSdkSession: (sessionId) => set((s) => ({ sdkSessionIds: { ...s.sdkSessionIds, [sessionId]: true } })),
   apply: (event) =>
     set((state) => {
       switch (event.type) {
@@ -92,6 +105,8 @@ export const useWorld = create<WorldStore>((set) => ({
               }, new Map<string, TranscriptLine[]>()),
             ),
             arsenal: Object.fromEntries((event.arsenals ?? []).map((a) => [a.projectDir, a])),
+            pending: {},
+            openQuestionId: undefined,
           };
         case 'hero-spawned':
         case 'hero-updated': {
@@ -105,11 +120,14 @@ export const useWorld = create<WorldStore>((set) => ({
         case 'hero-removed': {
           const heroes = { ...state.heroes };
           delete heroes[event.sessionId];
+          const pending = Object.fromEntries(
+            Object.entries(state.pending).filter(([, q]) => q.sessionId !== event.sessionId),
+          );
           // The followed hero was removed: clear selection and autofollow (no dead target).
           if (state.selectedSessionId === event.sessionId) {
-            return { heroes, selectedSessionId: undefined, autofollow: false };
+            return { heroes, pending, selectedSessionId: undefined, autofollow: false };
           }
-          return { heroes };
+          return { heroes, pending };
         }
         case 'peon-spawned':
         case 'peon-updated':
@@ -139,6 +157,15 @@ export const useWorld = create<WorldStore>((set) => ({
         case 'arsenal-updated': {
           return { arsenal: { ...state.arsenal, [event.arsenal.projectDir]: event.arsenal } };
         }
+        case 'pending-question':
+          return { pending: { ...state.pending, [event.question.id]: event.question } };
+        case 'pending-question-resolved': {
+          const pending = { ...state.pending };
+          delete pending[event.id];
+          return { pending, openQuestionId: state.openQuestionId === event.id ? undefined : state.openQuestionId };
+        }
+        case 'sdk-session-started':
+          return { sdkSessionIds: { ...state.sdkSessionIds, [event.sessionId]: true } };
         default:
           return state;
       }

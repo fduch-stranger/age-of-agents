@@ -10,7 +10,7 @@ import { Unit } from './unit';
 import { getHeroSheet, getPeonSheet, loadThemeSprites } from './sprites';
 import { loadEmblems } from './emblems';
 import { sessionToArchetypeKey } from './archetype';
-import { resolveModelLive } from '../model-store';
+import { resolveModelLive, pickSpriteLive } from '../model-store';
 import { loadTilemaps, hasTilemaps, buildTilemap } from './tilemap';
 import { loadBuildingSprites, getBuildingSprite } from './building-sprites';
 import { loadDecorationSprites, getDecorationTexture } from './decoration-sprites';
@@ -458,8 +458,9 @@ export class GameView {
         const home = this.building(homeId);
         const o = heroSpawnScatter(hero.sessionId);
         const door = { gx: home.door.gx + o.dx, gy: home.door.gy + o.dy };
-        const sheet = getHeroSheet(sessionToArchetypeKey(hero, resolveModelLive(hero.model).sprite));
+        const sheet = getHeroSheet(sessionToArchetypeKey(hero, pickSpriteLive(hero.model)));
         unit = new Unit(hero.sessionId, hero.teamColor, false, clipName(hero.title), door, this.theme.projection, sheet, hero.agent ?? 'claude', this.theme.heroSprite.scale, this.theme.heroSprite.footAnchor);
+        unit.setScreenFlipped(this.flipped);
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
         const sessionId = hero.sessionId;
@@ -495,6 +496,7 @@ export class GameView {
         const o = peonSpawnScatter(peon.agentId);
         const start = { gx: door.gx + o.dx, gy: door.gy + o.dy };
         unit = new Unit(peon.agentId, this.parentColor(peon, heroes), true, clipName(peon.description ?? 'peon', 22), start, this.theme.projection, getPeonSheet());
+        unit.setScreenFlipped(this.flipped);
         unit.container.eventMode = 'static';
         unit.container.cursor = 'pointer';
         const parentId = peon.parentSessionId;

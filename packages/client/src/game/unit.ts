@@ -127,6 +127,10 @@ export class Unit {
     this.crate.visible = visible;
   }
 
+  setScreenFlipped(flipped: boolean): void {
+    this.contextBar.scale.x = flipped ? -1 : 1;
+  }
+
   setContextProgress(pct: number | undefined): void {
     if (typeof pct !== 'number' || !Number.isFinite(pct)) {
       this.contextBar.visible = false;

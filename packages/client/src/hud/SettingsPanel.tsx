@@ -1,11 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { useUi } from '../i18n';
+import { useSettings } from '../settings';
 import { BuildingReactionsEditor } from './BuildingReactionsEditor';
 import { ModelRegistryEditor } from './ModelRegistryEditor';
 
 /** Settings modal. Sectioned; currently one section: building reactions. */
 export function SettingsPanel({ onClose }: { onClose: () => void }) {
   const t = useUi();
+  const allRandom = useSettings((s) => s.allRandom);
+  const setAllRandom = useSettings((s) => s.setAllRandom);
   const dialogRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<'buildings' | 'models'>('buildings');
 
@@ -82,7 +85,27 @@ export function SettingsPanel({ onClose }: { onClose: () => void }) {
             {t.tabModels}
           </button>
         </div>
-        {tab === 'buildings' ? <BuildingReactionsEditor /> : <ModelRegistryEditor />}
+        {tab === 'buildings' ? (
+          <BuildingReactionsEditor />
+        ) : (
+          <>
+            <label
+              className="px"
+              style={{ display: 'flex', alignItems: 'flex-start', gap: 8, margin: '4px 0 10px' }}
+            >
+              <input
+                type="checkbox"
+                checked={allRandom}
+                onChange={(e) => setAllRandom(e.target.checked)}
+              />
+              <span>
+                🎲 {t.allRandomLabel}
+                <span style={{ display: 'block', opacity: 0.7, fontSize: 11 }}>{t.allRandomHint}</span>
+              </span>
+            </label>
+            <ModelRegistryEditor />
+          </>
+        )}
       </div>
     </div>
   );

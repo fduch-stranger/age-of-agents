@@ -2,7 +2,10 @@ import { useState, useRef, useEffect } from 'react';
 import { useSettings, type Lang } from '../settings';
 import { useUi } from '../i18n';
 import { HooksPanel } from './HooksPanel';
+import { PanelControlToggle } from './PanelControlToggle';
 import { SettingsPanel } from './SettingsPanel';
+import { LaunchAgentButton } from './LaunchAgentButton';
+import { ProjectSwitcher } from './ProjectSwitcher';
 import { useMenuKeyboard } from './useMenuKeyboard';
 
 /** Language dropdown list: endonyms (name in that language) + flag + short code. */
@@ -20,6 +23,8 @@ export function ThemeSwitch() {
   const setLang = useSettings((s) => s.setLang);
   const flipped = useSettings((s) => s.flipped);
   const setFlipped = useSettings((s) => s.setFlipped);
+  const barCollapsed = useSettings((s) => s.barCollapsed);
+  const setBarCollapsed = useSettings((s) => s.setBarCollapsed);
   const t = useUi();
 
   const [langOpen, setLangOpen] = useState(false);
@@ -60,6 +65,23 @@ export function ThemeSwitch() {
 
   return (
     <div className="hud-panel" style={{ top: 12, left: 12, padding: 6, display: 'flex', gap: 6 }}>
+      {/* Collapse the WHOLE toolbar to a compact handle so it never stretches the
+          top edge; state is remembered across reloads (default collapsed). */}
+      <button
+        className="ghost"
+        onClick={() => setBarCollapsed(!barCollapsed)}
+        title={t.agentControls}
+        aria-label={t.agentControls}
+        aria-expanded={!barCollapsed}
+        style={{ display: 'inline-flex', alignItems: 'center' }}
+      >
+        {barCollapsed ? '☰' : '◂'}
+      </button>
+      {/* Kingdom switcher stays visible even when the bar is collapsed (it carries
+          the live session summary); merged here so it never overlaps the toolbar. */}
+      <ProjectSwitcher inline />
+      {!barCollapsed && (
+        <>
       <button
         className="ghost"
         style={themeId === 'fantasy' ? { background: '#3b3b35' } : undefined}
@@ -75,6 +97,8 @@ export function ThemeSwitch() {
         🛰️ {t.scifi}
       </button>
       <HooksPanel />
+      <PanelControlToggle />
+      <LaunchAgentButton />
 
       {/* Language as dropdown instead of a cycling button. */}
       <div ref={langRef} style={{ position: 'relative' }}>
@@ -145,6 +169,8 @@ export function ThemeSwitch() {
       >
         ⚙
       </button>
+        </>
+      )}
       {settingsOpen && (
         <SettingsPanel
           onClose={() => {
